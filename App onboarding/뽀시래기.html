@@ -1,0 +1,1627 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>뽀시래기 — 반려동물 관리 앱</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel">
+  /* ── ios-frame.jsx (inlined) ── */
+  function IOSStatusBar({ dark = false, time = '9:41' }) {
+    const c = dark ? '#fff' : '#000';
+    return (
+      <div style={{
+        display: 'flex', gap: 154, alignItems: 'center', justifyContent: 'center',
+        padding: '21px 24px 19px', boxSizing: 'border-box',
+        position: 'relative', zIndex: 20, width: '100%',
+      }}>
+        <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 1.5 }}>
+          <span style={{ fontFamily: '-apple-system, "SF Pro", system-ui', fontWeight: 590, fontSize: 17, lineHeight: '22px', color: c }}>{time}</span>
+        </div>
+        <div style={{ flex: 1, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, paddingTop: 1, paddingRight: 1 }}>
+          <svg width="19" height="12" viewBox="0 0 19 12">
+            <rect x="0" y="7.5" width="3.2" height="4.5" rx="0.7" fill={c}/>
+            <rect x="4.8" y="5" width="3.2" height="7" rx="0.7" fill={c}/>
+            <rect x="9.6" y="2.5" width="3.2" height="9.5" rx="0.7" fill={c}/>
+            <rect x="14.4" y="0" width="3.2" height="12" rx="0.7" fill={c}/>
+          </svg>
+          <svg width="17" height="12" viewBox="0 0 17 12">
+            <path d="M8.5 3.2C10.8 3.2 12.9 4.1 14.4 5.6L15.5 4.5C13.7 2.7 11.2 1.5 8.5 1.5C5.8 1.5 3.3 2.7 1.5 4.5L2.6 5.6C4.1 4.1 6.2 3.2 8.5 3.2Z" fill={c}/>
+            <path d="M8.5 6.8C9.9 6.8 11.1 7.3 12 8.2L13.1 7.1C11.8 5.9 10.2 5.1 8.5 5.1C6.8 5.1 5.2 5.9 3.9 7.1L5 8.2C5.9 7.3 7.1 6.8 8.5 6.8Z" fill={c}/>
+            <circle cx="8.5" cy="10.5" r="1.5" fill={c}/>
+          </svg>
+          <svg width="27" height="13" viewBox="0 0 27 13">
+            <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" stroke={c} strokeOpacity="0.35" fill="none"/>
+            <rect x="2" y="2" width="20" height="9" rx="2" fill={c}/>
+            <path d="M25 4.5V8.5C25.8 8.2 26.5 7.2 26.5 6.5C26.5 5.8 25.8 4.8 25 4.5Z" fill={c} fillOpacity="0.4"/>
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
+  function IOSGlassPill({ children, dark = false, style = {} }) {
+    return (
+      <div style={{
+        height: 44, minWidth: 44, borderRadius: 9999,
+        position: 'relative', overflow: 'hidden',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: dark
+          ? '0 2px 6px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.2)'
+          : '0 1px 3px rgba(0,0,0,0.07), 0 3px 10px rgba(0,0,0,0.06)',
+        ...style,
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: 9999,
+          backdropFilter: 'blur(12px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+          background: dark ? 'rgba(120,120,128,0.28)' : 'rgba(255,255,255,0.5)',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: 9999,
+          boxShadow: dark
+            ? 'inset 1.5px 1.5px 1px rgba(255,255,255,0.15), inset -1px -1px 1px rgba(255,255,255,0.08)'
+            : 'inset 1.5px 1.5px 1px rgba(255,255,255,0.7), inset -1px -1px 1px rgba(255,255,255,0.4)',
+          border: dark ? '0.5px solid rgba(255,255,255,0.15)' : '0.5px solid rgba(0,0,0,0.06)',
+        }} />
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  function IOSDevice({ children, width = 393, height = 852, dark = false }) {
+    return (
+      <div style={{
+        width, height, borderRadius: 54, overflow: 'hidden',
+        position: 'relative',
+        background: dark ? '#000' : '#1C1C1E',
+        boxShadow: '0 0 0 1px #3a3a3a, 0 40px 120px rgba(0,0,0,0.8), inset 0 0 0 1px #555',
+        fontFamily: "'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif",
+        WebkitFontSmoothing: 'antialiased',
+      }}>
+        {/* inner screen */}
+        <div style={{
+          position: 'absolute', inset: 12,
+          borderRadius: 44, overflow: 'hidden',
+          background: dark ? '#080B14' : '#FAFAF8',
+        }}>
+          {/* dynamic island */}
+          <div style={{
+            position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+            width: 126, height: 37, borderRadius: 24,
+            background: dark ? '#111' : '#1C1C1E', zIndex: 50,
+          }} />
+          {/* status bar */}
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 40 }}>
+            <IOSStatusBar dark={dark} />
+          </div>
+          {/* content */}
+          <div style={{ position: 'absolute', top: 62, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+            {children}
+          </div>
+          {/* home indicator */}
+          <div style={{
+            position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+            width: 134, height: 5, borderRadius: 3,
+            background: dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.22)', zIndex: 60,
+          }} />
+        </div>
+      </div>
+    );
+  }
+
+  Object.assign(window, { IOSDevice, IOSStatusBar, IOSGlassPill });
+  </script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    /* safe horizontal padding — avoids border-radius clip at corners */
+    .px-safe { padding-left: 20px; padding-right: 20px; }
+    .scroll-area {
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .scroll-area::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+/* ── tweaks-panel.jsx (inlined) ── */
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0;
+    scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+  .twk-body::-webkit-scrollbar{width:8px}
+  .twk-body::-webkit-scrollbar-track{background:transparent;margin:2px}
+  .twk-body::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px;
+    border:2px solid transparent;background-clip:content-box}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-val{color:rgba(41,38,27,.5);font-variant-numeric:tabular-nums}
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+  .twk-field{appearance:none;width:100%;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  .twk-field:focus{border-color:rgba(0,0,0,.25);background:rgba(255,255,255,.85)}
+  .twk-slider{appearance:none;-webkit-appearance:none;width:100%;height:4px;margin:6px 0;
+    border-radius:999px;background:rgba(0,0,0,.12);outline:none}
+  .twk-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+    width:14px;height:14px;border-radius:50%;background:#fff;
+    border:.5px solid rgba(0,0,0,.12);box-shadow:0 1px 3px rgba(0,0,0,.2);cursor:default}
+  .twk-seg{position:relative;display:flex;padding:2px;border-radius:8px;
+    background:rgba(0,0,0,.06);user-select:none}
+  .twk-seg-thumb{position:absolute;top:2px;bottom:2px;border-radius:6px;
+    background:rgba(255,255,255,.9);box-shadow:0 1px 2px rgba(0,0,0,.12);
+    transition:left .15s cubic-bezier(.3,.7,.4,1),width .15s}
+  .twk-seg button{appearance:none;position:relative;z-index:1;flex:1;border:0;
+    background:transparent;color:inherit;font:inherit;font-weight:500;min-height:22px;
+    border-radius:6px;cursor:default;padding:4px 6px;line-height:1.2}
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+  .twk-swatch{appearance:none;-webkit-appearance:none;width:56px;height:22px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:6px;padding:0;cursor:default;
+    background:transparent;flex-shrink:0}
+  .twk-swatch::-webkit-color-swatch-wrapper{padding:0}
+  .twk-swatch::-webkit-color-swatch{border:0;border-radius:5.5px}
+  .twk-btn{appearance:none;height:26px;padding:0 12px;border:0;border-radius:7px;
+    background:rgba(0,0,0,.78);color:#fff;font:inherit;font-weight:500;cursor:default}
+  .twk-btn:hover{background:rgba(0,0,0,.88)}
+  .twk-btn.secondary{background:rgba(0,0,0,.06);color:inherit}
+`;
+
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits }, '*');
+  }, []);
+  return [values, setTweak];
+}
+
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  const PAD = 16;
+  const clampToViewport = React.useCallback(() => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const w = panel.offsetWidth, h = panel.offsetHeight;
+    const maxRight = Math.max(PAD, window.innerWidth - w - PAD);
+    const maxBottom = Math.max(PAD, window.innerHeight - h - PAD);
+    offsetRef.current = {
+      x: Math.min(maxRight, Math.max(PAD, offsetRef.current.x)),
+      y: Math.min(maxBottom, Math.max(PAD, offsetRef.current.y)),
+    };
+    panel.style.right = offsetRef.current.x + 'px';
+    panel.style.bottom = offsetRef.current.y + 'px';
+  }, []);
+  React.useEffect(() => {
+    if (!open) return;
+    clampToViewport();
+    const ro = new ResizeObserver(clampToViewport);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [open, clampToViewport]);
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+  const dismiss = () => {
+    setOpen(false);
+    window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
+  };
+  const onDragStart = (e) => {
+    const panel = dragRef.current;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    const sx = e.clientX, sy = e.clientY;
+    const startRight = window.innerWidth - r.right;
+    const startBottom = window.innerHeight - r.bottom;
+    const move = (ev) => {
+      offsetRef.current = { x: startRight - (ev.clientX - sx), y: startBottom - (ev.clientY - sy) };
+      clampToViewport();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd" onMouseDown={onDragStart}>
+          <b>{title}</b>
+          <button className="twk-x" onMouseDown={(e) => e.stopPropagation()} onClick={dismiss}>✕</button>
+        </div>
+        <div className="twk-body">{children}</div>
+      </div>
+    </>
+  );
+}
+
+function TweakSection({ label }) { return <div className="twk-sect">{label}</div>; }
+function TweakRow({ label, value, children, inline = false }) {
+  return (
+    <div className={inline ? 'twk-row twk-row-h' : 'twk-row'}>
+      <div className="twk-lbl"><span>{label}</span>{value != null && <span className="twk-val">{value}</span>}</div>
+      {children}
+    </div>
+  );
+}
+function TweakSlider({ label, value, min = 0, max = 100, step = 1, unit = '', onChange }) {
+  return (
+    <TweakRow label={label} value={`${value}${unit}`}>
+      <input type="range" className="twk-slider" min={min} max={max} step={step}
+             value={value} onChange={(e) => onChange(Number(e.target.value))} />
+    </TweakRow>
+  );
+}
+function TweakColor({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <input type="color" className="twk-swatch" value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+function TweakButton({ label, onClick, secondary = false }) {
+  return (
+    <button type="button" className={secondary ? 'twk-btn secondary' : 'twk-btn'} onClick={onClick}>{label}</button>
+  );
+}
+</script>
+<script type="text/babel">
+
+/* ─── DEFAULTS & CONTEXT ─── */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "primaryColor": "#F5A623",
+  "accentColor": "#6DB56D",
+  "cardRadius": 16,
+  "buttonRadius": 14
+}/*EDITMODE-END*/;
+
+const ThemeCtx = React.createContext(TWEAK_DEFAULTS);
+const useT = () => React.useContext(ThemeCtx);
+
+/* static palette */
+const S = {
+  bg: '#FAFAF8', white: '#FFFFFF', text: '#2D2D2D',
+  sub: '#888888', light: '#BBBBBB', border: '#EFEFED', danger: '#E05252',
+};
+const pLight = '#FFF4E0';
+const aLight = '#EAF7EA';
+
+/* ─── ICONS ─── */
+function HomeIcon({ active, color }) {
+  const c = color || (active ? '#F5A623' : S.light);
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" fill={active ? c : 'none'} stroke={c} strokeWidth="1.8" strokeLinejoin="round"/>
+      <path d="M9 21V12h6v9" stroke={active ? '#fff' : c} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+}
+function PawIcon({ active, color }) {
+  const c = color || (active ? '#F5A623' : S.light);
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <ellipse cx="12" cy="13" rx="4.5" ry="4" fill={active ? c : 'none'} stroke={c} strokeWidth="1.8"/>
+      <ellipse cx="6.5" cy="10" rx="1.8" ry="2.2" fill={c}/>
+      <ellipse cx="17.5" cy="10" rx="1.8" ry="2.2" fill={c}/>
+      <ellipse cx="9" cy="7" rx="1.5" ry="2" fill={c}/>
+      <ellipse cx="15" cy="7" rx="1.5" ry="2" fill={c}/>
+    </svg>
+  );
+}
+function CareIcon({ active, color }) {
+  const c = color || (active ? '#F5A623' : S.light);
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="4" width="18" height="17" rx="3" stroke={c} strokeWidth="1.8" fill={active ? c : 'none'}/>
+      <path d="M3 9h18" stroke={active ? '#fff' : c} strokeWidth="1.8"/>
+      <path d="M8 2v4M16 2v4" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+      <path d="M7 14h4M7 17.5h7" stroke={active ? '#fff' : c} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+}
+function SparkIcon({ active, color }) {
+  const c = color || (active ? '#F5A623' : S.light);
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <path d="M12 2l2.5 7.5H22l-6.5 4.5 2.5 7.5L12 17l-6 4.5 2.5-7.5L3 9.5h7.5L12 2z" fill={active ? c : 'none'} stroke={c} strokeWidth="1.8" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+function Chevron({ size = 16, color = S.light }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M9 6l6 6-6 6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+function Check({ size = 14, color = '#fff' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M5 13l4 4L19 7" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+function Plus({ size = 20, color = '#fff' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 5v14M5 12h14" stroke={color} strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+function Back({ size = 22, color = S.text }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M15 18l-6-6 6-6" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+function Camera({ size = 14, color = '#fff' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="2" y="7" width="20" height="15" rx="3" stroke={color} strokeWidth="1.8"/>
+      <circle cx="12" cy="14.5" r="3.5" stroke={color} strokeWidth="1.8"/>
+      <path d="M8 7l1.5-3h5L16 7" stroke={color} strokeWidth="1.8" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+
+function MyPageIcon({ active, color }) {
+  const c = color || (active ? '#F5A623' : S.light);
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="8" r="3.5" fill={active ? c : 'none'} stroke={c} strokeWidth="1.8"/>
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  );
+}
+function DiaryTabIcon({ active, color }) {
+  const c = color || (active ? '#F5A623' : S.light);
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="3" width="8" height="8" rx="2" fill={active ? c : 'none'} stroke={c} strokeWidth="1.8"/>
+      <rect x="13" y="3" width="8" height="8" rx="2" fill={active ? c : 'none'} stroke={c} strokeWidth="1.8"/>
+      <rect x="3" y="13" width="8" height="8" rx="2" fill={active ? c : 'none'} stroke={c} strokeWidth="1.8"/>
+      <rect x="13" y="13" width="8" height="8" rx="2" stroke={c} strokeWidth="1.8"/>
+    </svg>
+  );
+}
+function PetTabIcon({ active, color }) {
+  const c = color || (active ? '#F5A623' : S.light);
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <ellipse cx="12" cy="13" rx="4.5" ry="4" fill={active ? c : 'none'} stroke={c} strokeWidth="1.8"/>
+      <ellipse cx="6.5" cy="10" rx="1.8" ry="2.2" fill={c}/>
+      <ellipse cx="17.5" cy="10" rx="1.8" ry="2.2" fill={c}/>
+      <ellipse cx="9" cy="7" rx="1.5" ry="2" fill={c}/>
+      <ellipse cx="15" cy="7" rx="1.5" ry="2" fill={c}/>
+    </svg>
+  );
+}
+function WalkIcon({ active, color }) {
+  const c = color || (active ? '#F5A623' : S.light);
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+      <circle cx="13" cy="3.5" r="2" fill={c}/>
+      <path d="M10.5 8c0.8-1.4 3.8-1.4 4.2 0L16.5 12l-2.8 1.5L12.5 10l-2.5 4H7.5L10.5 8z" fill={c}/>
+      <path d="M9.5 14l-2 6" stroke={c} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M13 14l2.5 6" stroke={c} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M7.5 20l-1.5 1.5" stroke={c} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M15.5 20l1.5 1.5" stroke={c} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  );
+}
+function TabBar({ active, onChange }) {
+  const { primaryColor } = useT();
+  const tabs = [
+    { id: 'home', label: '홈', Icon: HomeIcon },
+    { id: 'care', label: '관리', Icon: CareIcon },
+    { id: 'walk', label: '산책', Icon: WalkIcon },
+    { id: 'diary', label: '사진', Icon: DiaryTabIcon },
+    { id: 'mypage', label: '마이', Icon: MyPageIcon },
+  ];
+  return (
+    <div style={{
+      position: 'absolute', bottom: 0, left: 0, right: 0, height: 82,
+      background: '#fff', borderTop: `1px solid ${S.border}`,
+      display: 'flex', alignItems: 'flex-start', paddingTop: 8, zIndex: 90,
+    }}>
+      {tabs.map(t => (
+        <button key={t.id} onClick={() => onChange(t.id)} style={{
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: active === t.id ? primaryColor : S.light, padding: 0,
+        }}>
+          <t.Icon active={active === t.id} color={active === t.id ? primaryColor : S.light} />
+          <span style={{ fontSize: 10, fontWeight: active === t.id ? 700 : 500 }}>{t.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ─── PRIMARY BUTTON ─── */
+function PrimaryBtn({ label, onClick, disabled }) {
+  const { primaryColor, buttonRadius } = useT();
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', height: 56, borderRadius: buttonRadius,
+      background: disabled ? S.border : `linear-gradient(135deg, ${primaryColor}, #FFB84D)`,
+      border: 'none', cursor: disabled ? 'default' : 'pointer',
+      color: disabled ? S.light : '#fff',
+      fontSize: 17, fontWeight: 700,
+      fontFamily: 'inherit',
+      boxShadow: disabled ? 'none' : `0 8px 24px ${primaryColor}44`,
+      transition: 'all 0.2s',
+    }}>{label}</button>
+  );
+}
+
+/* ═══════════════════════════════════════
+   SCREEN 1 — SURVEY
+═══════════════════════════════════════ */
+function SurveyScreen({ onNext, onBack }) {
+  const { primaryColor, cardRadius } = useT();
+  const [selected, setSelected] = React.useState(null);
+  const step = 1; const total = 7;
+  const options = [
+    { id: 'small', emoji: '🏢', label: '소형 아파트' },
+    { id: 'large', emoji: '🏠', label: '대형 아파트' },
+    { id: 'house', emoji: '🏡', label: '주택 (마당 없음)' },
+    { id: 'garden', emoji: '🌿', label: '주택 (마당 있음)' },
+  ];
+  const optionBtnStyle = {
+    background: 'transparent',
+    border: 'none',
+    display: 'block',
+    width: '100%',
+  };
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+      <div style={{ padding: '20px 20px 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          {onBack
+            ? <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={onBack}><Back /></button>
+            : <div style={{ width: 22 }} />
+          }
+          <span style={{ fontSize: 13, fontWeight: 600, color: S.sub }}>{step} / {total}</span>
+          <div style={{ width: 22 }} />
+        </div>
+        <div style={{ height: 6, background: S.border, borderRadius: 3, overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', width: `${(step / total) * 100}%`,
+            background: `linear-gradient(90deg, ${primaryColor}, #FFB84D)`,
+            borderRadius: 3, transition: 'width 0.4s ease',
+          }} />
+        </div>
+      </div>
+      <div style={{ padding: '20px 20px 12px' }}>
+        <p style={{ fontSize: 13, color: primaryColor, fontWeight: 700, marginBottom: 8 }}>주거 환경</p>
+        <h2 style={{ fontSize: 21, fontWeight: 800, color: S.text, lineHeight: 1.35 }}>어디에 살고 계세요?</h2>
+        <p style={{ fontSize: 14, color: S.sub, marginTop: 8 }}>반려동물에게 맞는 공간을 파악하기 위해 필요해요.</p>
+      </div>
+      <div style={{ flex: 1, padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }} className="scroll-area">
+        {options.map(opt => (
+          <button key={opt.id} onClick={() => setSelected(opt.id)} style={{
+            background: selected === opt.id ? pLight : S.white,
+            border: `2px solid ${selected === opt.id ? primaryColor : S.border}`,
+            borderRadius: cardRadius,
+            padding: '14px 16px',
+            width: '100%',
+            display: 'flex', alignItems: 'center', gap: 10,
+            cursor: 'pointer', textAlign: 'left',
+            transition: 'all 0.18s ease',
+            transform: selected === opt.id ? 'scale(1.01)' : 'scale(1)',
+            boxShadow: selected === opt.id ? `0 4px 16px ${primaryColor}28` : '0 1px 4px rgba(0,0,0,0.06)',
+            fontFamily: 'inherit',
+            minWidth: 0,
+          }}>
+            <span style={{ fontSize: 24, flexShrink: 0 }}>{opt.emoji}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: selected === opt.id ? primaryColor : S.text, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', wordBreak: 'keep-all' }}>{opt.label}</span>
+            {selected === opt.id && (
+              <div style={{
+                marginLeft: 'auto', width: 24, height: 24, borderRadius: '50%',
+                background: primaryColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Check size={14} />
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+      <div style={{ padding: '16px 20px 24px' }}>
+        <PrimaryBtn label="다음으로" disabled={!selected} onClick={() => selected && onNext && onNext()} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   SCREEN 2 — RECOMMENDATION
+═══════════════════════════════════════ */
+function RecommendScreen({ onNext }) {
+  const { primaryColor, accentColor, cardRadius, buttonRadius } = useT();
+  const [expanded, setExpanded] = React.useState(null);
+  const [chosen, setChosen] = React.useState(null);
+  const dogs = [
+    { id: 'maltese', rank: 1, name: '말티즈', emoji: '🐶', tags: ['털 적음', '초보자 적합', '소형견'], bg: pLight, desc: '온순하고 애교가 많아 초보 반려인에게 딱입니다. 소형 공간에서도 잘 지내요.', personality: '활발하고 애교 넘침', cost: '월 15~25만원', adoption: true },
+    { id: 'bichon', rank: 2, name: '비숑 프리제', emoji: '🐾', tags: ['저알레르기', '활발함', '중소형'], bg: aLight, desc: '털 빠짐이 적고 알레르기 걱정이 덜해요. 사람을 좋아하는 성격이에요.', personality: '명랑하고 사교적', cost: '월 18~28만원', adoption: false },
+    { id: 'poodle', rank: 3, name: '토이 푸들', emoji: '🎀', tags: ['영리함', '훈련 쉬움', '소형견'], bg: '#F0EEFF', desc: '지능이 높아 훈련이 잘 되고, 다양한 주거 환경에 빠르게 적응해요.', personality: '영리하고 순종적', cost: '월 20~30만원', adoption: true },
+  ];
+  const rankColors = [primaryColor, accentColor, '#B0B0B0'];
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+      <div style={{ padding: '16px 20px 12px', background: S.white, borderBottom: `1px solid ${S.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          <span style={{ fontSize: 18 }}>✨</span>
+          <span style={{ fontSize: 13, color: primaryColor, fontWeight: 700 }}>AI 맞춤 추천</span>
+        </div>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: S.text, lineHeight: 1.35 }}>뽀미에게 딱 맞는<br />친구를 찾았어요!</h2>
+        <p style={{ fontSize: 13, color: S.sub, marginTop: 6 }}>답변을 분석해 최적의 견종을 선별했어요.</p>
+      </div>
+      <div className="scroll-area" style={{ flex: 1, padding: '12px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {dogs.map((dog, i) => (
+          <div key={dog.id} onClick={() => setExpanded(expanded === dog.id ? null : dog.id)} style={{
+            background: S.white, borderRadius: cardRadius, overflow: 'hidden', cursor: 'pointer',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+            border: `2px solid ${chosen === dog.id ? primaryColor : 'transparent'}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '16px', gap: 12 }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                background: rankColors[i], display: 'flex', alignItems: 'center',
+                justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 800,
+              }}>{dog.rank}</div>
+              <div style={{
+                width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+                background: dog.bg, display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: 26,
+              }}>{dog.emoji}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: S.text, marginBottom: 5 }}>{dog.name}</div>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                  {dog.tags.map(tag => (
+                    <span key={tag} style={{
+                      fontSize: 11, fontWeight: 600, padding: '3px 8px',
+                      background: i === 0 ? pLight : i === 1 ? aLight : '#F5F5F5',
+                      color: i === 0 ? primaryColor : i === 1 ? accentColor : S.sub,
+                      borderRadius: 20,
+                    }}>{tag}</span>
+                  ))}
+                </div>
+              </div>
+              <Chevron color={expanded === dog.id ? primaryColor : S.light} />
+            </div>
+            {expanded === dog.id && (
+              <div style={{ borderTop: `1px solid ${S.border}`, padding: '14px 16px', background: '#FAFAFA' }}>
+                <p style={{ fontSize: 13, color: S.sub, lineHeight: 1.6, marginBottom: 10 }}>{dog.desc}</p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <span style={{ fontSize: 12, color: S.text, fontWeight: 600 }}>성격: <span style={{ fontWeight: 400 }}>{dog.personality}</span></span>
+                  <span style={{ color: S.border }}>|</span>
+                  <span style={{ fontSize: 12, color: S.text, fontWeight: 600 }}>비용: <span style={{ fontWeight: 400 }}>{dog.cost}</span></span>
+                  <span style={{ color: S.border }}>|</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: dog.adoption ? accentColor : S.light }}>
+                    {dog.adoption ? '✓ 유기견 입양 가능' : '입양 정보 없음'}
+                  </span>
+                </div>
+                <button onClick={e => { e.stopPropagation(); setChosen(dog.id); }} style={{
+                  padding: '8px 16px', borderRadius: 10, fontFamily: 'inherit',
+                  background: chosen === dog.id ? primaryColor : pLight,
+                  color: chosen === dog.id ? '#fff' : primaryColor,
+                  border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                }}>{chosen === dog.id ? '✓ 선택됨' : '이 아이 선택'}</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ padding: '12px 20px 24px', background: S.white, borderTop: `1px solid ${S.border}` }}>
+        <PrimaryBtn label="이 아이로 시작할게요 →" onClick={() => onNext && onNext()} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   SCREEN 3 — PET PROFILE
+═══════════════════════════════════════ */
+function PetProfileScreen({ onNext, onBack }) {
+  const { primaryColor, accentColor, cardRadius, buttonRadius } = useT();
+  const [name, setName] = React.useState('');
+  const [gender, setGender] = React.useState('');
+  const [neutered, setNeutered] = React.useState(null);
+  const [weight, setWeight] = React.useState('');
+  const [breed, setBreed] = React.useState('말티즈');
+  const [birthday, setBirthday] = React.useState('2023-05-10');
+
+  const inputStyle = {
+    width: '100%', height: 50, borderRadius: 12,
+    border: `1.5px solid ${S.border}`, background: S.white,
+    padding: '0 14px', fontSize: 15, color: S.text,
+    fontFamily: 'Pretendard, sans-serif', outline: 'none',
+  };
+  const Field = ({ label, children }) => (
+    <div style={{ marginBottom: 16 }}>
+      <label style={{ fontSize: 12, fontWeight: 700, color: S.sub, display: 'block', marginBottom: 6 }}>{label}</label>
+      {children}
+    </div>
+  );
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+      <div style={{ padding: '14px 20px 10px', background: S.white, borderBottom: `1px solid ${S.border}` }}>
+        <button style={{ background: 'none', border: 'none', cursor: 'pointer', marginBottom: 8, padding: 0 }} onClick={() => onBack ? onBack() : null}><Back /></button>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: S.text }}>반려동물 등록</h2>
+        <p style={{ fontSize: 13, color: S.sub, marginTop: 4 }}>소중한 가족을 소개해 주세요 🐾</p>
+      </div>
+      <div className="scroll-area" style={{ flex: 1, padding: '16px 20px 10px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24 }}>
+          <div style={{ position: 'relative' }}>
+            <div style={{
+              width: 96, height: 96, borderRadius: '50%', background: pLight,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 40, border: `3px solid ${primaryColor}`,
+            }}>🐶</div>
+            <div style={{
+              position: 'absolute', bottom: 0, right: 0, width: 30, height: 30,
+              borderRadius: '50%', background: primaryColor, border: '2px solid #fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            }}><Camera /></div>
+          </div>
+        </div>
+        <Field label="이름">
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="예: 뽀미" style={inputStyle} />
+        </Field>
+        <Field label="생일">
+          <input type="date" value={birthday} onChange={e => setBirthday(e.target.value)} style={inputStyle} />
+        </Field>
+        <Field label="견종">
+          <select value={breed} onChange={e => setBreed(e.target.value)} style={{ ...inputStyle, appearance: 'none', cursor: 'pointer' }}>
+            {['말티즈','비숑 프리제','토이 푸들','포메라니안','시추','직접 입력'].map(v => <option key={v}>{v}</option>)}
+          </select>
+        </Field>
+        <Field label="성별">
+          <div style={{ display: 'flex', gap: 10 }}>
+            {['수컷','암컷'].map(g => (
+              <button key={g} onClick={() => setGender(g)} style={{
+                flex: 1, height: 50, borderRadius: 12, fontFamily: 'inherit',
+                border: `1.5px solid ${gender === g ? primaryColor : S.border}`,
+                background: gender === g ? pLight : S.white,
+                color: gender === g ? primaryColor : S.sub,
+                fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              }}>{g === '수컷' ? '♂ 수컷' : '♀ 암컷'}</button>
+            ))}
+          </div>
+        </Field>
+        <Field label="몸무게 (kg)">
+          <input value={weight} onChange={e => setWeight(e.target.value)} placeholder="예: 3.2" type="number" style={inputStyle} />
+        </Field>
+        <Field label="중성화 여부">
+          <div style={{ display: 'flex', gap: 10 }}>
+            {[{ v: true, label: '완료' }, { v: false, label: '미완료' }].map(({ v, label }) => (
+              <button key={label} onClick={() => setNeutered(v)} style={{
+                flex: 1, height: 50, borderRadius: 12, fontFamily: 'inherit',
+                border: `1.5px solid ${neutered === v ? accentColor : S.border}`,
+                background: neutered === v ? aLight : S.white,
+                color: neutered === v ? accentColor : S.sub,
+                fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              }}>{label}</button>
+            ))}
+          </div>
+        </Field>
+      </div>
+      <div style={{ padding: '12px 20px 24px', background: S.white, borderTop: `1px solid ${S.border}` }}>
+        <PrimaryBtn label="등록 완료" onClick={() => onNext && onNext()} />
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   SCREEN 4 — HOME DASHBOARD
+═══════════════════════════════════════ */
+function HomeScreen() {
+  const { primaryColor, accentColor, cardRadius } = useT();
+  const [checks, setChecks] = React.useState({ morning: true, evening: false, medicine: false });
+  const today = new Date();
+  const dateStr = `${today.getMonth()+1}월 ${today.getDate()}일 ${['일','월','화','수','목','금','토'][today.getDay()]}요일`;
+  const careItems = [
+    { id: 'morning', emoji: '🌅', label: '아침 밥', time: '오전 8:00' },
+    { id: 'evening', emoji: '🌙', label: '저녁 밥', time: '오후 6:00' },
+    { id: 'medicine', emoji: '💊', label: '구충제 약', time: '오후 8:00' },
+  ];
+  const doneCount = Object.values(checks).filter(Boolean).length;
+  return (
+    <div className="scroll-area" style={{ height: '100%', background: S.bg, paddingBottom: 82 }}>
+      <div style={{ padding: '16px 20px 14px', background: S.white }}>
+        <p style={{ fontSize: 12, color: S.sub, fontWeight: 500, marginBottom: 4 }}>{dateStr}</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: 17, fontWeight: 800, color: S.text, lineHeight: 1.4 }}>안녕하세요,<br />뽀미 보호자님 👋</h2>
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%', background: pLight,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22, cursor: 'pointer',
+          }}>🔔</div>
+        </div>
+      </div>
+      {/* Pet card */}
+      <div style={{ margin: '14px 20px 0' }}>
+        <div style={{
+          background: `linear-gradient(135deg, ${primaryColor} 0%, #FFB84D 100%)`,
+          borderRadius: cardRadius + 4, padding: '20px',
+          display: 'flex', alignItems: 'center', gap: 16, position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{ position: 'absolute', right: -20, top: -20, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.15)' }} />
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, flexShrink: 0 }}>🐶</div>
+          <div>
+            <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 600 }}>나의 반려견</p>
+            <p style={{ color: '#fff', fontSize: 20, fontWeight: 800 }}>뽀미</p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.25)', color: '#fff', padding: '2px 8px', borderRadius: 20, fontWeight: 600, whiteSpace: 'nowrap' }}>말티즈</span>
+              <span style={{ fontSize: 11, background: 'rgba(255,255,255,0.25)', color: '#fff', padding: '2px 8px', borderRadius: 20, fontWeight: 600, whiteSpace: 'nowrap' }}>D+365</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Care checklist */}
+      <div style={{ margin: '16px 20px 0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 800, color: S.text, whiteSpace: 'nowrap' }}>오늘의 케어</h3>
+          <span style={{ fontSize: 12, color: S.sub, whiteSpace: 'nowrap' }}>{doneCount}/{careItems.length} 완료</span>
+        </div>
+        <div style={{ background: S.white, borderRadius: cardRadius, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,0.06)' }}>
+          {careItems.map((item, i) => (
+            <div key={item.id} onClick={() => setChecks(prev => ({ ...prev, [item.id]: !prev[item.id] }))}
+              style={{
+                display: 'flex', alignItems: 'center', padding: '14px 16px', gap: 12,
+                borderBottom: i < careItems.length - 1 ? `1px solid ${S.border}` : 'none',
+                cursor: 'pointer', background: checks[item.id] ? '#FAFAF8' : S.white,
+              }}>
+              <span style={{ fontSize: 22 }}>{item.emoji}</span>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 14, fontWeight: 600, color: checks[item.id] ? S.light : S.text, textDecoration: checks[item.id] ? 'line-through' : 'none' }}>{item.label}</p>
+                <p style={{ fontSize: 11, color: S.light, marginTop: 1 }}>{item.time}</p>
+              </div>
+              <div style={{
+                width: 24, height: 24, borderRadius: '50%',
+                background: checks[item.id] ? accentColor : 'transparent',
+                border: `2px solid ${checks[item.id] ? accentColor : S.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s',
+              }}>
+                {checks[item.id] && <Check size={12} />}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* Upcoming */}
+      <div style={{ margin: '16px 20px 0' }}>
+        <h3 style={{ fontSize: 15, fontWeight: 800, color: S.text, marginBottom: 12 }}>다가오는 일정</h3>
+        {[
+          { emoji: '💊', bg: '#FFF0F0', label: '심장사상충 약 먹는 날', when: '3일 후 · 5월 6일', color: S.danger },
+          { emoji: '🏥', bg: aLight, label: '정기 건강검진', when: '12일 후 · 5월 15일', color: accentColor },
+        ].map((ev, i) => (
+          <div key={i} style={{
+            marginTop: i > 0 ? 10 : 0, background: S.white, borderRadius: cardRadius, padding: '14px 16px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: 14,
+            border: `1px solid ${S.border}`,
+          }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: ev.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>{ev.emoji}</div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 14, fontWeight: 700, color: S.text }}>{ev.label}</p>
+              <p style={{ fontSize: 12, color: ev.color, fontWeight: 600, marginTop: 2 }}>{ev.when}</p>
+            </div>
+            <Chevron />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   SCREEN 5 — CARE SCHEDULE
+═══════════════════════════════════════ */
+function CareScreen() {
+  const { primaryColor, accentColor, cardRadius } = useT();
+  const [activeTab, setActiveTab] = React.useState('today');
+  const [items, setItems] = React.useState([
+    { id: 1, emoji: '🍚', label: '아침 밥', time: '오전 8:00', done: true, cat: 'today' },
+    { id: 2, emoji: '💊', label: '심장사상충 약', time: '오후 8:00', done: false, cat: 'today' },
+    { id: 3, emoji: '🍚', label: '저녁 밥', time: '오후 6:00', done: false, cat: 'today' },
+    { id: 4, emoji: '👂', label: '귀 청소', time: '오후 3:00', done: false, cat: 'week' },
+    { id: 5, emoji: '🛁', label: '목욕', time: '오전 11:00', done: false, cat: 'week' },
+    { id: 6, emoji: '✂️', label: '발톱 다듬기', time: '미정', done: false, cat: 'all' },
+    { id: 7, emoji: '🏥', label: '정기 건강검진', time: '5월 15일', done: false, cat: 'all' },
+  ]);
+  const tabs = [{ id: 'today', label: '오늘' }, { id: 'week', label: '이번 주' }, { id: 'all', label: '전체' }];
+  const filtered = activeTab === 'all' ? items : items.filter(i => i.cat === activeTab || (activeTab === 'week' && i.cat === 'today'));
+  const doneCount = items.filter(i => i.done).length;
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+      <div style={{ padding: '16px 20px 0', background: S.white, borderBottom: `1px solid ${S.border}` }}>
+        <h2 style={{ fontSize: 20, fontWeight: 800, color: S.text, marginBottom: 14, whiteSpace: 'nowrap' }}>케어 관리</h2>
+        <div style={{ display: 'flex' }}>
+          {tabs.map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+              flex: 1, padding: '10px 0', background: 'none', border: 'none', fontFamily: 'inherit',
+              cursor: 'pointer', fontSize: 14, fontWeight: 700,
+              color: activeTab === tab.id ? primaryColor : S.sub,
+              borderBottom: `2.5px solid ${activeTab === tab.id ? primaryColor : 'transparent'}`,
+            }}>{tab.label}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ padding: '10px 20px 6px' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: pLight, borderRadius: 20, padding: '6px 12px' }}>
+          <span style={{ fontSize: 14 }}>✅</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: primaryColor, whiteSpace: 'nowrap' }}>{doneCount}개 완료</span>
+          <span style={{ fontSize: 13, color: S.sub, whiteSpace: 'nowrap' }}>/ 총 {filtered.length}개</span>
+        </div>
+      </div>
+      <div className="scroll-area" style={{ flex: 1, padding: '6px 20px 90px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {filtered.map(item => (
+          <div key={item.id} onClick={() => setItems(prev => prev.map(i => i.id === item.id ? { ...i, done: !i.done } : i))}
+            style={{
+              background: S.white, borderRadius: cardRadius, padding: '14px 16px',
+              display: 'flex', alignItems: 'center', gap: 12,
+              boxShadow: '0 1px 6px rgba(0,0,0,0.06)', cursor: 'pointer',
+              opacity: item.done ? 0.55 : 1,
+              border: `1.5px solid ${item.done ? S.border : 'transparent'}`,
+              transition: 'opacity 0.2s',
+            }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: 12, flexShrink: 0,
+              background: item.done ? S.border : pLight,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
+            }}>{item.emoji}</div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 15, fontWeight: 600, color: S.text, textDecoration: item.done ? 'line-through' : 'none' }}>{item.label}</p>
+              <p style={{ fontSize: 12, color: S.light, marginTop: 2 }}>{item.time}</p>
+            </div>
+            <div style={{
+              width: 26, height: 26, borderRadius: '50%',
+              background: item.done ? accentColor : 'transparent',
+              border: `2px solid ${item.done ? accentColor : S.border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s',
+            }}>
+              {item.done && <Check size={13} />}
+            </div>
+          </div>
+        ))}
+      </div>
+      <button style={{
+        position: 'absolute', right: 20, bottom: 94, width: 52, height: 52, borderRadius: '50%',
+        background: `linear-gradient(135deg, ${primaryColor}, #FFB84D)`,
+        border: 'none', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: `0 6px 20px ${primaryColor}66`, zIndex: 50,
+      }}><Plus size={22} /></button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   SCREEN 6 — PHOTO DIARY
+═══════════════════════════════════════ */
+function DiaryScreen() {
+  const { primaryColor, accentColor, cardRadius } = useT();
+  const [month, setMonth] = React.useState(5);
+  const photoDates = [3, 7, 10, 14, 17, 21, 24, 28];
+  const emojis = ['🐶', '🌸', '🎾', '🐾', '☀️', '🏃', '🛁', '❤️'];
+  const daysInMonth = 31; const startDay = 4;
+  const storageUsed = 320; const storageTotal = 500;
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+      <div style={{ padding: '16px 20px 10px', background: S.white, borderBottom: `1px solid ${S.border}` }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: S.text, whiteSpace: 'nowrap' }}>사진 다이어리</h2>
+          <button style={{ background: pLight, border: 'none', borderRadius: 10, cursor: 'pointer', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0 }}>
+            <Plus size={14} color={primaryColor} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: primaryColor }}>추가</span>
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, marginTop: 14 }}>
+          <button onClick={() => setMonth(m => Math.max(1, m-1))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: S.sub, lineHeight: 1 }}>‹</button>
+          <span style={{ fontSize: 15, fontWeight: 800, color: S.text, whiteSpace: 'nowrap' }}>2026년 {month}월</span>
+          <button onClick={() => setMonth(m => Math.min(12, m+1))} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: S.sub, lineHeight: 1 }}>›</button>
+        </div>
+      </div>
+      <div className="scroll-area" style={{ flex: 1, paddingBottom: 82 }}>
+        <div style={{ padding: '14px 20px', background: S.white, marginBottom: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3, marginBottom: 6 }}>
+            {['일','월','화','수','목','금','토'].map((d, i) => (
+              <div key={d} style={{ textAlign: 'center', fontSize: 10, fontWeight: 700, color: i === 0 ? S.danger : S.sub }}>{d}</div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 3 }}>
+            {Array.from({ length: startDay }).map((_, i) => <div key={`e${i}`} />)}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const idx = photoDates.indexOf(day);
+              const has = idx >= 0;
+              return (
+                <div key={day} style={{
+                  aspectRatio: '1', borderRadius: 7, overflow: 'hidden',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  background: has ? pLight : 'transparent', cursor: has ? 'pointer' : 'default',
+                  gap: 1,
+                }}>
+                  {has && <span style={{ fontSize: 12 }}>{emojis[idx]}</span>}
+                  <span style={{ fontSize: 9, fontWeight: has ? 700 : 400, color: has ? primaryColor : S.sub }}>{day}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ padding: '4px 20px 10px' }}>
+          <h3 style={{ fontSize: 13, fontWeight: 700, color: S.sub, marginBottom: 10 }}>최근 추억</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 6 }}>
+            {photoDates.slice(0, 6).map((day, i) => (
+              <div key={day} style={{
+                aspectRatio: '1', borderRadius: 12, cursor: 'pointer', overflow: 'hidden', position: 'relative',
+                background: `hsl(${28 + i * 22}, 60%, ${85 + i}%)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span style={{ fontSize: 30 }}>{emojis[i]}</span>
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'linear-gradient(transparent,rgba(0,0,0,0.35))', padding: '14px 6px 5px' }}>
+                  <p style={{ fontSize: 10, color: '#fff', fontWeight: 700, textAlign: 'center' }}>5월 {day}일</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ margin: '4px 20px 0', background: S.white, borderRadius: cardRadius, padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: S.text }}>저장 용량</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: S.sub }}>{storageUsed}MB / {storageTotal}MB</span>
+          </div>
+          <div style={{ height: 7, background: S.border, borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${(storageUsed/storageTotal)*100}%`, background: `linear-gradient(90deg, ${accentColor}, #8FD48F)`, borderRadius: 4 }} />
+          </div>
+          <p style={{ fontSize: 11, color: S.light, marginTop: 6 }}>무료 플랜: 500MB까지 무료로 저장할 수 있어요.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   SCREEN 7 — PET LIST (반려동물 탭)
+═══════════════════════════════════════ */
+function PetListScreen({ onAdd, onBack }) {
+  const { primaryColor, accentColor, cardRadius } = useT();
+  const pets = [
+    { id: 1, name: '뽀미', breed: '말티즈', emoji: '🐶', age: '2살 3개월', weight: '3.2kg', gender: '♀', neutered: true, color: pLight },
+  ];
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+      <div style={{ padding: '20px 20px 14px', background: S.white, borderBottom: `1px solid ${S.border}` }}>
+        <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginBottom: 8 }} onClick={() => onBack && onBack()}><Back /></button>
+        <h2 style={{ fontSize: 22, fontWeight: 800, color: S.text }}>반려동물</h2>
+        <p style={{ fontSize: 13, color: S.sub, marginTop: 4 }}>함께하는 소중한 가족들이에요 🐾</p>
+      </div>
+      <div className="scroll-area" style={{ flex: 1, padding: '16px 20px 90px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {pets.map(pet => (
+          <div key={pet.id} style={{
+            background: S.white, borderRadius: cardRadius + 4,
+            padding: '18px', boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+            display: 'flex', gap: 16, alignItems: 'center',
+            border: `1.5px solid ${S.border}`,
+          }}>
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: pet.color, display: 'flex', alignItems: 'center',
+              justifyContent: 'center', fontSize: 36, flexShrink: 0,
+              border: `2.5px solid ${primaryColor}`,
+            }}>{pet.emoji}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 18, fontWeight: 800, color: S.text }}>{pet.name}</span>
+                <span style={{ fontSize: 12, color: S.sub }}>{pet.gender}</span>
+              </div>
+              <span style={{ fontSize: 12, background: pLight, color: primaryColor, fontWeight: 600, padding: '2px 8px', borderRadius: 20 }}>{pet.breed}</span>
+              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                <span style={{ fontSize: 12, color: S.sub, whiteSpace: 'nowrap' }}>{pet.age}</span>
+                <span style={{ fontSize: 12, color: S.sub, whiteSpace: 'nowrap' }}>{pet.weight}</span>
+                <span style={{ fontSize: 12, color: pet.neutered ? accentColor : S.light, fontWeight: 600, whiteSpace: 'nowrap' }}>{pet.neutered ? '중성화 ✓' : '미중성화'}</span>
+              </div>
+            </div>
+            <Chevron />
+          </div>
+        ))}
+
+        {/* 추가 카드 */}
+        <button onClick={() => onAdd && onAdd()} style={{
+          background: 'none', border: `2px dashed ${S.border}`,
+          borderRadius: cardRadius + 4, padding: '20px',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+          cursor: 'pointer', width: '100%', fontFamily: 'inherit',
+        }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            background: pLight, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Plus size={22} color={primaryColor} />
+          </div>
+          <span style={{ fontSize: 14, fontWeight: 700, color: primaryColor }}>반려동물 추가하기</span>
+          <span style={{ fontSize: 12, color: S.sub }}>강아지, 고양이 등 새 친구를 등록하세요</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   SCREEN 8 — MY PAGE (로그인/회원가입/프로필)
+═══════════════════════════════════════ */
+function MyPageScreen({ onAddPet, onViewPets }) {
+  const { primaryColor, accentColor, cardRadius, buttonRadius } = useT();
+  const [mode, setMode] = React.useState('login'); // 'login' | 'signup' | 'profile'
+  const [id, setId] = React.useState('');
+  const [pw, setPw] = React.useState('');
+  const [pwConfirm, setPwConfirm] = React.useState('');
+  const [nickname, setNickname] = React.useState('');
+  const [loggedIn, setLoggedIn] = React.useState(false);
+  const [userName, setUserName] = React.useState('');
+
+  const inputStyle = {
+    width: '100%', height: 50, borderRadius: 12,
+    border: `1.5px solid ${S.border}`, background: S.white,
+    padding: '0 14px', fontSize: 15, color: S.text,
+    fontFamily: 'Pretendard, sans-serif', outline: 'none',
+  };
+  const Field = ({ label, children }) => (
+    <div style={{ marginBottom: 14 }}>
+      <label style={{ fontSize: 12, fontWeight: 700, color: S.sub, display: 'block', marginBottom: 6 }}>{label}</label>
+      {children}
+    </div>
+  );
+
+  if (loggedIn) {
+    // 프로필 뷰
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+        {/* 프로필 헤더 */}
+        <div style={{
+          background: `linear-gradient(135deg, ${primaryColor}, #FFB84D)`,
+          padding: '28px 20px 24px', position: 'relative', overflow: 'hidden',
+        }}>
+          <div style={{ position: 'absolute', right: -30, top: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.12)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{
+              width: 64, height: 64, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 28, border: '2px solid rgba(255,255,255,0.6)',
+            }}>👤</div>
+            <div>
+              <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 600 }}>뽀시래기 회원</p>
+              <p style={{ color: '#fff', fontSize: 20, fontWeight: 800 }}>{userName || '뽀미 보호자'}</p>
+              <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 }}>{id || 'ppomi@email.com'}</p>
+            </div>
+          </div>
+        </div>
+        <div className="scroll-area" style={{ flex: 1, padding: '16px 20px 90px' }}>
+          {/* 반려동물 요약 */}
+          <div style={{ background: S.white, borderRadius: cardRadius, padding: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.06)', marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: S.sub }}>나의 반려동물</p>
+              <button onClick={() => onAddPet && onAddPet()} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, color: primaryColor, fontFamily: 'inherit', padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
+                <span style={{ fontSize: 14 }}>+</span> 추가
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }} onClick={() => onViewPets && onViewPets()}>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: pLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🐶</div>
+              <div>
+                <p style={{ fontSize: 15, fontWeight: 700, color: S.text }}>뽀미</p>
+                <p style={{ fontSize: 12, color: S.sub }}>말티즈 · D+365</p>
+              </div>
+              <Chevron />
+            </div>
+          </div>
+          {/* 설정 목록 */}
+          {[
+            { emoji: '🔔', label: '알림 설정' },
+            { emoji: '🔒', label: '비밀번호 변경' },
+            { emoji: '📋', label: '이용약관' },
+            { emoji: '💬', label: '고객센터' },
+          ].map((item, i, arr) => (
+            <div key={item.label} style={{
+              background: S.white, borderRadius: i === 0 ? `${cardRadius}px ${cardRadius}px 0 0` : i === arr.length-1 ? `0 0 ${cardRadius}px ${cardRadius}px` : 0,
+              borderBottom: i < arr.length-1 ? `1px solid ${S.border}` : 'none',
+              padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
+              cursor: 'pointer',
+              boxShadow: i === 0 ? '0 -1px 0 rgba(0,0,0,0.04)' : 'none',
+            }}>
+              <span style={{ fontSize: 18 }}>{item.emoji}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: S.text, flex: 1 }}>{item.label}</span>
+              <Chevron />
+            </div>
+          ))}
+          <button onClick={() => setLoggedIn(false)} style={{
+            marginTop: 16, width: '100%', height: 48, borderRadius: buttonRadius,
+            background: 'none', border: `1.5px solid ${S.border}`,
+            color: S.sub, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+          }}>로그아웃</button>
+        </div>
+      </div>
+    );
+  }
+
+  // 로그인 / 회원가입 폼
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+      {/* 탭 */}
+      <div style={{ background: S.white, borderBottom: `1px solid ${S.border}` }}>
+        <div style={{ padding: '20px 20px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <span style={{ fontSize: 22 }}>🐾</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: S.text, whiteSpace: 'nowrap' }}>뽀시래기</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex' }}>
+          {['login','signup'].map(m => (
+            <button key={m} onClick={() => setMode(m)} style={{
+              flex: 1, padding: '10px 0', background: 'none', border: 'none',
+              fontFamily: 'inherit', cursor: 'pointer', fontSize: 14, fontWeight: 700,
+              color: mode === m ? primaryColor : S.sub,
+              borderBottom: `2.5px solid ${mode === m ? primaryColor : 'transparent'}`,
+            }}>{m === 'login' ? '로그인' : '회원가입'}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="scroll-area" style={{ flex: 1, padding: '24px 20px' }}>
+        {mode === 'login' ? (
+          <>
+            <p style={{ fontSize: 18, fontWeight: 800, color: S.text, marginBottom: 4 }}>다시 만나서 반가워요! 🐶</p>
+            <p style={{ fontSize: 13, color: S.sub, marginBottom: 24 }}>로그인하고 반려동물과 함께해요.</p>
+            <Field label="아이디 (이메일)">
+              <input value={id} onChange={e => setId(e.target.value)} placeholder="ppomi@email.com" style={inputStyle} />
+            </Field>
+            <Field label="비밀번호">
+              <input value={pw} onChange={e => setPw(e.target.value)} type="password" placeholder="비밀번호를 입력해 주세요" style={inputStyle} />
+            </Field>
+            <button onClick={() => { setLoggedIn(true); setUserName(nickname || '뽀미 보호자'); }}
+              style={{
+                marginTop: 8, width: '100%', height: 56, borderRadius: buttonRadius,
+                background: `linear-gradient(135deg, ${primaryColor}, #FFB84D)`,
+                border: 'none', cursor: 'pointer', color: '#fff', fontSize: 17, fontWeight: 700,
+                fontFamily: 'inherit', boxShadow: `0 8px 24px ${primaryColor}44`,
+              }}>로그인</button>
+            <p style={{ textAlign: 'center', fontSize: 13, color: S.sub, marginTop: 16 }}>
+              아직 계정이 없으신가요?{' '}
+              <span onClick={() => setMode('signup')} style={{ color: primaryColor, fontWeight: 700, cursor: 'pointer' }}>회원가입</span>
+            </p>
+          </>
+        ) : (
+          <>
+            <p style={{ fontSize: 18, fontWeight: 800, color: S.text, marginBottom: 4 }}>뽀시래기 가입하기 🎉</p>
+            <p style={{ fontSize: 13, color: S.sub, marginBottom: 24 }}>반려동물과 함께하는 여정을 시작해요.</p>
+            <Field label="닉네임">
+              <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="예: 뽀미 보호자" style={inputStyle} />
+            </Field>
+            <Field label="아이디 (이메일)">
+              <input value={id} onChange={e => setId(e.target.value)} placeholder="ppomi@email.com" style={inputStyle} />
+            </Field>
+            <Field label="비밀번호">
+              <input value={pw} onChange={e => setPw(e.target.value)} type="password" placeholder="8자 이상 입력해 주세요" style={inputStyle} />
+            </Field>
+            <Field label="비밀번호 확인">
+              <input value={pwConfirm} onChange={e => setPwConfirm(e.target.value)} type="password" placeholder="비밀번호를 한 번 더 입력해 주세요" style={inputStyle} />
+              {pwConfirm && pw !== pwConfirm && (
+                <p style={{ fontSize: 11, color: S.danger, marginTop: 4 }}>비밀번호가 일치하지 않아요.</p>
+              )}
+              {pwConfirm && pw === pwConfirm && pw.length >= 8 && (
+                <p style={{ fontSize: 11, color: accentColor, marginTop: 4 }}>✓ 비밀번호가 일치해요.</p>
+              )}
+            </Field>
+            <button onClick={() => { if (pw === pwConfirm && pw.length >= 8) { setLoggedIn(true); setUserName(nickname); } }}
+              style={{
+                marginTop: 8, width: '100%', height: 56, borderRadius: buttonRadius,
+                background: (pw === pwConfirm && pw.length >= 8 && nickname) ? `linear-gradient(135deg, ${primaryColor}, #FFB84D)` : S.border,
+                border: 'none', cursor: 'pointer',
+                color: (pw === pwConfirm && pw.length >= 8 && nickname) ? '#fff' : S.light,
+                fontSize: 17, fontWeight: 700, fontFamily: 'inherit',
+                boxShadow: (pw === pwConfirm && pw.length >= 8 && nickname) ? `0 8px 24px ${primaryColor}44` : 'none',
+              }}>가입 완료</button>
+            <p style={{ textAlign: 'center', fontSize: 13, color: S.sub, marginTop: 16 }}>
+              이미 계정이 있으신가요?{' '}
+              <span onClick={() => setMode('login')} style={{ color: primaryColor, fontWeight: 700, cursor: 'pointer' }}>로그인</span>
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   WALK SCREENS
+═══════════════════════════════════════ */
+const WALK_WAYPOINTS = [
+  [30,135],[58,112],[82,92],[112,100],[145,125],
+  [172,118],[198,92],[225,70],[252,82],[278,102],
+  [305,118],[328,106],[350,88]
+];
+
+function WalkScreen({ onStart }) {
+  const { primaryColor, cardRadius } = useT();
+  const sampleWalks = [
+    { date: '5월 2일 (금)', time: '오후 5:30', duration: '32분', distance: '2.4', emoji: '☀️' },
+    { date: '4월 30일 (수)', time: '오전 8:15', duration: '25분', distance: '1.8', emoji: '🌤️' },
+    { date: '4월 28일 (월)', time: '오후 6:00', duration: '41분', distance: '3.1', emoji: '⛅' },
+  ];
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+      <div style={{ padding: '20px 20px 0' }}>
+        <h2 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 16px', color: S.text }}>산책 기록</h2>
+        <div style={{
+          background: `linear-gradient(135deg, ${primaryColor}, #FFB84D)`,
+          borderRadius: cardRadius, padding: '18px 20px', color: '#fff',
+        }}>
+          <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 10, fontWeight: 600 }}>이번 달 · 5월</div>
+          <div style={{ display: 'flex', gap: 28 }}>
+            {[['3','회'],['7.3','km'],['33','분 평균']].map(([val, unit]) => (
+              <div key={unit}>
+                <div style={{ fontSize: 30, fontWeight: 800, lineHeight: 1 }}>{val}</div>
+                <div style={{ fontSize: 11, opacity: 0.75, marginTop: 3 }}>{unit}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px 108px' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: S.sub, marginBottom: 10 }}>최근 산책</div>
+        {sampleWalks.map((w, i) => (
+          <div key={i} style={{
+            background: '#fff', borderRadius: cardRadius,
+            padding: '14px 16px', marginBottom: 10,
+            display: 'flex', alignItems: 'center', gap: 12,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, background: S.bg,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+            }}>{w.emoji}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: S.text }}>
+                {w.date} <span style={{ color: S.sub, fontWeight: 500, fontSize: 12 }}>{w.time}</span>
+              </div>
+              <div style={{ fontSize: 13, color: S.sub, marginTop: 3 }}>{w.distance}km · {w.duration}</div>
+            </div>
+            <Chevron />
+          </div>
+        ))}
+      </div>
+      <div style={{ position: 'absolute', bottom: 90, left: 20, right: 20 }}>
+        <PrimaryBtn label="🐾  산책 시작" onClick={onStart} />
+      </div>
+    </div>
+  );
+}
+
+function WalkActiveScreen({ onStop }) {
+  const [elapsed, setElapsed] = React.useState(0);
+  const [isPaused, setIsPaused] = React.useState(false);
+
+  React.useEffect(() => {
+    if (isPaused) return;
+    const id = setInterval(() => setElapsed(e => e + 1), 1000);
+    return () => clearInterval(id);
+  }, [isPaused]);
+
+  const dist = parseFloat((elapsed * 0.003).toFixed(2));
+  const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const secs = String(elapsed % 60).padStart(2, '0');
+  const paceText = dist > 0
+    ? (() => { const p = (elapsed / 60) / dist; return `${Math.floor(p)}'${String(Math.round((p % 1) * 60)).padStart(2, '0')}`; })()
+    : "--'--";
+  const dotIdx = Math.min(Math.floor(elapsed / 15), WALK_WAYPOINTS.length - 1);
+  const dot = WALK_WAYPOINTS[dotIdx];
+  const activePoints = WALK_WAYPOINTS.slice(0, dotIdx + 1).map(p => p.join(',')).join(' ');
+  const fullPoints = WALK_WAYPOINTS.map(p => p.join(',')).join(' ');
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#080B14' }}>
+      <div style={{ padding: '14px 20px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>산책 중 · 뽀미</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ width: 7, height: 7, borderRadius: 4, background: '#6DB56D', boxShadow: '0 0 6px #6DB56D' }} />
+          <span style={{ fontSize: 12, color: '#6DB56D', fontWeight: 600 }}>GPS 연결됨</span>
+        </div>
+      </div>
+
+      <div style={{ textAlign: 'center', padding: '16px 0 8px' }}>
+        <div style={{
+          fontSize: 72, fontWeight: 800, color: '#fff',
+          letterSpacing: -2, lineHeight: 1, fontVariantNumeric: 'tabular-nums',
+        }}>{mins}:{secs}</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', marginTop: 6 }}>경과 시간</div>
+      </div>
+
+      <div style={{ display: 'flex', padding: '0 24px', marginBottom: 10 }}>
+        {[{ val: dist.toFixed(2), unit: 'km' }, { val: paceText, unit: '분/km' }].map(({ val, unit }, i) => (
+          <React.Fragment key={unit}>
+            {i > 0 && <div style={{ width: 1, background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />}
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 34, fontWeight: 800, color: '#fff', fontVariantNumeric: 'tabular-nums' }}>{val}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{unit}</div>
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, margin: '0 16px', borderRadius: 20, background: '#0F1628', overflow: 'hidden' }}>
+        <svg width="100%" height="100%" viewBox="0 0 380 170" preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }}>
+          <line x1="0" y1="85" x2="380" y2="85" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
+          <line x1="190" y1="0" x2="190" y2="170" stroke="rgba(255,255,255,0.04)" strokeWidth="1"/>
+          <polyline points={fullPoints} stroke="rgba(255,255,255,0.07)" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          {dotIdx > 0 && (
+            <polyline points={activePoints} stroke="#F5A623" strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+          )}
+          <circle cx={WALK_WAYPOINTS[0][0]} cy={WALK_WAYPOINTS[0][1]} r="5" fill="#6DB56D"/>
+          <circle cx={dot[0]} cy={dot[1]} r="10" fill="#F5A62330"/>
+          <circle cx={dot[0]} cy={dot[1]} r="6" fill="#F5A623" stroke="#fff" strokeWidth="1.5"/>
+        </svg>
+      </div>
+
+      <div style={{ padding: '14px 16px 18px', display: 'flex', gap: 10, alignItems: 'center' }}>
+        <button style={{
+          width: 50, height: 50, borderRadius: 25,
+          background: 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Camera size={20} />
+        </button>
+        <button onClick={() => setIsPaused(p => !p)} style={{
+          flex: 1, height: 52, borderRadius: 26,
+          background: 'rgba(255,255,255,0.10)', border: 'none', cursor: 'pointer',
+          color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'inherit',
+        }}>
+          {isPaused ? '▶  재개' : '⏸  일시정지'}
+        </button>
+        <button onClick={() => onStop({ elapsed, distance: dist })} style={{
+          width: 52, height: 52, borderRadius: 26,
+          background: '#F5A623', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 4px 16px #F5A62366',
+        }}>
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <rect x="3" y="3" width="12" height="12" rx="3" fill="white"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function WalkResultScreen({ result, onSave, onDiscard }) {
+  const { primaryColor, cardRadius } = useT();
+  const [memo, setMemo] = React.useState('');
+  const { elapsed = 0, distance = 0 } = result || {};
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const pace = distance > 0 ? (elapsed / 60) / distance : 0;
+  const paceMin = Math.floor(pace);
+  const paceSec = Math.round((pace % 1) * 60);
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: S.bg }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '20px 20px 108px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 22,
+            background: `${primaryColor}22`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+          }}>🐾</div>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: S.text }}>산책 완료!</div>
+            <div style={{ fontSize: 13, color: S.sub }}>5월 3일 · 오늘</div>
+          </div>
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: cardRadius, padding: 20, marginBottom: 14, boxShadow: '0 2px 12px rgba(0,0,0,0.07)' }}>
+          <div style={{ display: 'flex', textAlign: 'center' }}>
+            {[
+              { val: distance.toFixed(2), unit: 'km', color: primaryColor },
+              { val: `${mins}:${String(secs).padStart(2,'0')}`, unit: '시간', color: S.text },
+              { val: `${paceMin}'${String(paceSec).padStart(2,'0')}`, unit: '분/km', color: S.text },
+            ].map(({ val, unit, color }, i) => (
+              <React.Fragment key={unit}>
+                {i > 0 && <div style={{ width: 1, background: S.border, margin: '0 4px' }} />}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 26, fontWeight: 800, color }}>{val}</div>
+                  <div style={{ fontSize: 11, color: S.sub, marginTop: 3 }}>{unit}</div>
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ background: '#0F1628', borderRadius: cardRadius, overflow: 'hidden', marginBottom: 14, height: 130 }}>
+          <svg width="100%" height="130" viewBox="0 0 380 130" preserveAspectRatio="xMidYMid meet" style={{ display: 'block' }}>
+            <polyline
+              points="30,105 58,82 82,62 112,70 145,95 172,88 198,62 225,40 252,52 278,72 305,88 328,76 350,58"
+              stroke="#F5A623" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"
+            />
+            <circle cx="30" cy="105" r="5" fill="#6DB56D"/>
+            <circle cx="350" cy="58" r="5" fill="#F5A623" stroke="#fff" strokeWidth="1.5"/>
+            <text x="36" y="109" fill="rgba(255,255,255,0.4)" fontSize="9">출발</text>
+            <text x="320" y="53" fill="rgba(255,255,255,0.4)" fontSize="9">도착</text>
+          </svg>
+        </div>
+
+        <div style={{ background: '#fff', borderRadius: cardRadius, padding: '14px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: S.sub, marginBottom: 8 }}>메모</div>
+          <textarea
+            value={memo}
+            onChange={e => setMemo(e.target.value)}
+            placeholder="오늘 산책은 어땠나요? 🐾"
+            style={{
+              width: '100%', height: 80, border: 'none', resize: 'none',
+              fontSize: 14, color: S.text, fontFamily: 'inherit',
+              outline: 'none', background: 'transparent', boxSizing: 'border-box',
+            }}
+          />
+        </div>
+      </div>
+
+      <div style={{ position: 'absolute', bottom: 90, left: 20, right: 20, display: 'flex', gap: 10 }}>
+        <button onClick={onDiscard} style={{
+          height: 52, padding: '0 20px', borderRadius: 14,
+          background: S.border, border: 'none', cursor: 'pointer',
+          fontSize: 14, fontWeight: 600, color: S.sub, fontFamily: 'inherit',
+        }}>삭제</button>
+        <button onClick={() => onSave(memo)} style={{
+          flex: 1, height: 52, borderRadius: 14,
+          background: `linear-gradient(135deg, ${primaryColor}, #FFB84D)`,
+          border: 'none', cursor: 'pointer',
+          color: '#fff', fontSize: 15, fontWeight: 700, fontFamily: 'inherit',
+          boxShadow: `0 6px 20px ${primaryColor}44`,
+        }}>저장하기</button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   ROOT APP
+═══════════════════════════════════════ */
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [screen, setScreen] = React.useState('survey');
+  const [tab, setTab] = React.useState('home');
+  const [walkResult, setWalkResult] = React.useState(null);
+
+  const isOnboarding = ['survey','recommend','profile'].includes(screen);
+  const isFullScreen = screen === 'walk_active';
+
+  const handleTab = (t) => {
+    setTab(t);
+    const map = { home: 'home', care: 'care', walk: 'walk', diary: 'diary', mypage: 'mypage' };
+    setScreen(map[t] || 'home');
+  };
+
+  const renderScreen = () => {
+    if (screen === 'survey') return <SurveyScreen onNext={() => setScreen('recommend')} />;
+    if (screen === 'recommend') return <RecommendScreen onNext={() => setScreen('profile')} />;
+    if (screen === 'profile') return <PetProfileScreen onNext={() => { setScreen('home'); setTab('home'); }} onBack={() => setScreen('recommend')} />;
+    if (screen === 'home') return <HomeScreen />;
+    if (screen === 'care') return <CareScreen />;
+    if (screen === 'diary') return <DiaryScreen />;
+    if (screen === 'walk') return <WalkScreen onStart={() => setScreen('walk_active')} />;
+    if (screen === 'walk_active') return <WalkActiveScreen onStop={(res) => { setWalkResult(res); setScreen('walk_result'); }} />;
+    if (screen === 'walk_result') return <WalkResultScreen result={walkResult} onSave={() => { setScreen('walk'); setTab('walk'); }} onDiscard={() => { setScreen('walk'); setTab('walk'); }} />;
+    if (screen === 'pets') return <PetListScreen onAdd={() => setScreen('profile_from_pets')} onBack={() => { setScreen('mypage'); setTab('mypage'); }} />;
+    if (screen === 'profile_from_pets') return <PetProfileScreen onNext={() => { setScreen('pets'); setTab('pet'); }} onBack={() => { setScreen('pets'); setTab('pet'); }} />;
+    if (screen === 'mypage') return <MyPageScreen onAddPet={() => { setScreen('profile_from_pets'); }} onViewPets={() => { setScreen('pets'); }} />;
+    return <HomeScreen />;
+  };
+
+  return (
+    <ThemeCtx.Provider value={tweaks}>
+      <IOSDevice width={393} height={852} dark={screen === 'walk_active'}>
+        {renderScreen()}
+        {!isOnboarding && !isFullScreen && <TabBar active={tab} onChange={handleTab} />}
+      </IOSDevice>
+
+      {/* Onboarding dots */}
+      {isOnboarding && (
+        <div style={{
+          position: 'fixed', bottom: 28, left: '50%', transform: 'translateX(-50%)',
+          display: 'flex', gap: 8, alignItems: 'center',
+        }}>
+          {['survey','recommend','profile'].map(s => (
+            <button key={s} onClick={() => setScreen(s)} style={{
+              width: s === screen ? 22 : 8, height: 8,
+              borderRadius: 4, border: 'none', cursor: 'pointer',
+              background: s === screen ? tweaks.primaryColor : 'rgba(255,255,255,0.45)',
+              padding: 0, transition: 'all 0.25s',
+            }} />
+          ))}
+        </div>
+      )}
+
+      {/* Tweaks panel */}
+      <TweaksPanel>
+        <TweakSection label="컬러" />
+        <TweakColor label="Primary 컬러" value={tweaks.primaryColor} onChange={v => setTweak('primaryColor', v)} />
+        <TweakColor label="Accent 컬러" value={tweaks.accentColor} onChange={v => setTweak('accentColor', v)} />
+        <TweakSection label="모양" />
+        <TweakSlider label="카드 모서리" value={tweaks.cardRadius} min={8} max={28} step={2} onChange={v => setTweak('cardRadius', v)} />
+        <TweakSlider label="버튼 모서리" value={tweaks.buttonRadius} min={8} max={28} step={2} onChange={v => setTweak('buttonRadius', v)} />
+        <TweakSection label="화면 이동" />
+        <TweakButton label="① 설문 화면" onClick={() => setScreen('survey')} />
+        <TweakButton label="② 추천 결과" onClick={() => setScreen('recommend')} />
+        <TweakButton label="③ 프로필 등록" onClick={() => setScreen('profile')} />
+        <TweakButton label="④ 홈 대시보드" onClick={() => { setScreen('home'); setTab('home'); }} />
+        <TweakButton label="⑤ 케어 관리" onClick={() => { setScreen('care'); setTab('care'); }} />
+        <TweakButton label="⑥ 사진 다이어리" onClick={() => { setScreen('diary'); setTab('diary'); }} />
+        <TweakButton label="⑦ 산책 기록" onClick={() => { setScreen('walk'); setTab('walk'); }} />
+        <TweakButton label="⑧ 산책 중 (라이브)" onClick={() => { setScreen('walk_active'); setTab('walk'); }} />
+        <TweakButton label="⑨ 산책 결과" onClick={() => { setWalkResult({ elapsed: 1980, distance: 2.4 }); setScreen('walk_result'); setTab('walk'); }} />
+        <TweakButton label="⑩ 반려동물 목록" onClick={() => setScreen('pets')} />
+        <TweakButton label="⑪ 마이페이지" onClick={() => { setScreen('mypage'); setTab('mypage'); }} />
+      </TweaksPanel>
+    </ThemeCtx.Provider>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,75 @@
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { router } from 'expo-router';
+import { Colors, Radius, Shadow } from '@/constants/design';
+
+export default function WelcomeScreen() {
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        <View style={styles.top}>
+          <Text style={styles.emoji}>🐾</Text>
+          <Text style={styles.title}>뽀시래기에{'\n'}오신 걸 환영해요!</Text>
+          <Text style={styles.sub}>현재 반려동물을 키우고 계신가요?</Text>
+        </View>
+
+        <View style={styles.choices}>
+          <TouchableOpacity
+            style={styles.choiceYes}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(onboarding)/register-pet')}
+          >
+            <Text style={styles.choiceEmoji}>🐶</Text>
+            <Text style={styles.choiceYesLabel}>네, 키우고 있어요</Text>
+            <Text style={styles.choiceYesSub}>아이를 바로 등록할게요</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.choiceNo}
+            activeOpacity={0.85}
+            onPress={() => router.push('/(onboarding)/survey')}
+          >
+            <Text style={styles.choiceEmoji}>🤔</Text>
+            <Text style={styles.choiceNoLabel}>아직 없어요</Text>
+            <Text style={styles.choiceNoSub}>설문으로 맞는 동물을 찾아볼게요</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: Colors.bg },
+  container: { flex: 1, padding: 28, justifyContent: 'center', gap: 48 },
+
+  top: { alignItems: 'center', gap: 12 },
+  emoji: { fontSize: 64 },
+  title: { fontSize: 26, fontWeight: '800', color: Colors.text, textAlign: 'center', lineHeight: 36 },
+  sub: { fontSize: 15, color: Colors.sub, textAlign: 'center' },
+
+  choices: { gap: 14 },
+
+  choiceYes: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.card + 4,
+    paddingVertical: 24, paddingHorizontal: 20,
+    alignItems: 'center', gap: 6,
+    ...Shadow.card,
+    shadowColor: Colors.primary,
+    shadowOpacity: 0.35,
+  },
+  choiceEmoji: { fontSize: 36 },
+  choiceYesLabel: { fontSize: 18, fontWeight: '800', color: Colors.white },
+  choiceYesSub: { fontSize: 13, color: 'rgba(255,255,255,0.8)' },
+
+  choiceNo: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.card + 4,
+    paddingVertical: 24, paddingHorizontal: 20,
+    alignItems: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: Colors.border,
+    ...Shadow.sm,
+  },
+  choiceNoLabel: { fontSize: 18, fontWeight: '800', color: Colors.text },
+  choiceNoSub: { fontSize: 13, color: Colors.sub },
+});

@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx expo *)",
+      "Bash(Select-String \"walk-active|care-add\")",
+      "Bash(node -e \"require\\('expo-notifications'\\)\")",
+      "Bash(findstr \"\\\\\"main\\\\\"\\\\|\\\\\"version\\\\\"\\\\|\\\\\"name\\\\\"\")",
+      "Bash(node *)",
+      "Bash(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\ghwn1\\\\pet-care-app\\\\supabase\\\\functions\\\\delete-account\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Output \"ok\")",
+      "PowerShell(New-Item *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\ghwn1\\\\pet-care-app\" -Recurse -Directory)",
+      "Bash(Select-Object -First 20 FullName)",
+      "PowerShell(Get-ChildItem -Path 'C:\\\\Users\\\\ghwn1\\\\pet-care-app\\\\app\\\\\\(tabs\\)\\\\' -File | ForEach-Object { $_.Name })",
+      "WebFetch(domain:apis.data.go.kr)",
+      "WebFetch(domain:www.data.go.kr)",
+      "WebSearch",
+      "WebFetch(domain:www.gimi9.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:openapi.animal.go.kr)",
+      "Bash(supabase *)",
+      "PowerShell(supabase *)",
+      "WebFetch(domain:syptczpdmgzwlhumbnuw.supabase.co)",
+      "PowerShell($anonKey = \"sb_publishable_qgjPgYTYmjWBs1cMXMYMKw_81WDk8f2\"; Invoke-RestMethod -Uri \"https://syptczpdmgzwlhumbnuw.supabase.co/functions/v1/animal-proxy?type=myip\" -Headers @{ Authorization = \"Bearer $anonKey\" } | ConvertTo-Json)",
+      "mcp__plugin_supabase_supabase__list_tables",
+      "mcp__plugin_supabase_supabase__list_edge_functions",
+      "mcp__plugin_supabase_supabase__execute_sql",
+      "PowerShell(Copy-Item *)",
+      "PowerShell(Add-Type -AssemblyName System.Drawing; $img = [System.Drawing.Image]::FromFile\\(\"C:\\\\Users\\\\ghwn1\\\\pet-care-app\\\\assets\\\\images\\\\logo.png\"\\); \"$\\($img.Width\\) x $\\($img.Height\\)\"; $img.Dispose\\(\\))",
+      "PowerShell(python -c \"from PIL import Image; print\\('ok'\\)\")"
+    ]
+  }
+}
