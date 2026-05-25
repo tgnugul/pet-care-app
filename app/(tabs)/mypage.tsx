@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { usePetStore, SPECIES_EMOJI, formatAge } from '@/stores/pet.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useFamilyStore } from '@/stores/family.store';
+import { useSubscriptionStore } from '@/stores/subscription.store';
 
 const STATIC_MENU = [
   { emoji: '📊', label: '월간 건강 리포트', sub: '프리미엄 기능' },
@@ -17,10 +18,11 @@ const STATIC_MENU = [
 ];
 
 export default function MyPageScreen() {
-  const { pets, loading, fetchPets, deletePet, updatePetPhoto } = usePetStore();
+  const { pets, loading, fetchPets, deletePet, updatePetPhoto, updatePet } = usePetStore();
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const { loadSettings } = useSettingsStore();
-  const { family, members, myUserId, loading: familyLoading, fetchFamily, createFamily, joinFamily, leaveFamily, removeMember, dissolveFamily, regenerateCode } = useFamilyStore();
+  const { family, members, myUserId, loading: familyLoading, fetchFamily, createFamily, joinFamily, leaveFamily, removeMember, dissolveFamily } = useFamilyStore();
+  const { isPremium, fetchStatus } = useSubscriptionStore();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -38,6 +40,7 @@ export default function MyPageScreen() {
     fetchPets();
     loadSettings();
     fetchFamily();
+    fetchStatus();
     supabase.auth.getSession().then(({ data }) => {
       setUserEmail(data.session?.user?.email ?? null);
       setDisplayName(data.session?.user?.user_metadata?.display_name ?? null);
@@ -103,7 +106,35 @@ export default function MyPageScreen() {
     copyTimerRef.current = setTimeout(() => setCodeCopied(false), 2000);
   }
 
-  async function handleChangePetPhoto(petId: string) {
+  function handleChangePetPhoto(petId: string) {
+    const hasPhoto = !!pets.find(p => p.id === petId)?.profile_photo_url;
+    const buttons: Parameters<typeof Alert.alert>[2] = [
+      { text: '카메라로 촬영', onPress: () => pickPetPhotoFromCamera(petId) },
+      { text: '앨범에서 선택', onPress: () => pickPetPhotoFromGallery(petId) },
+    ];
+    if (hasPhoto) {
+      buttons.push({ text: '사진 제거', style: 'destructive', onPress: () => updatePet(petId, { profile_photo_url: null }) });
+    }
+    buttons.push({ text: '취소', style: 'cancel' });
+    Alert.alert('프로필 사진 변경', '사진을 선택하는 방법을 선택해주세요', buttons);
+  }
+
+  async function pickPetPhotoFromCamera(petId: string) {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('권한 필요', '카메라 접근 권한이 필요해요.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled) uploadPetPhoto(petId, result.assets[0].uri);
+  }
+
+  async function pickPetPhotoFromGallery(petId: string) {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('권한 필요', '사진 접근 권한이 필요해요.');
@@ -115,25 +146,28 @@ export default function MyPageScreen() {
       aspect: [1, 1],
       quality: 0.8,
     });
-    if (result.canceled) return;
+    if (!result.canceled) uploadPetPhoto(petId, result.assets[0].uri);
+  }
 
+  async function uploadPetPhoto(petId: string, uri: string) {
     setUploadingPhotoId(petId);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
       const resized = await manipulateAsync(
-        result.assets[0].uri,
+        uri,
         [{ resize: { width: 400, height: 400 } }],
-        { compress: 0.8, format: SaveFormat.JPEG },
+        { compress: 0.8, format: SaveFormat.JPEG, base64: true },
       );
-      const response = await fetch(resized.uri);
-      const blob = await response.blob();
       const filePath = `${session.user.id}/${petId}.jpg`;
+      const binary = atob(resized.base64 ?? '');
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const { error: uploadError } = await supabase.storage
         .from('pet-photos')
-        .upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
-      if (uploadError) { Alert.alert('업로드 실패', '다시 시도해주세요.'); return; }
+        .upload(filePath, bytes, { contentType: 'image/jpeg', upsert: true });
+      if (uploadError) { Alert.alert('업로드 실패', uploadError.message); return; }
 
       const { data: urlData } = supabase.storage.from('pet-photos').getPublicUrl(filePath);
       await updatePetPhoto(petId, urlData.publicUrl);
@@ -211,6 +245,18 @@ export default function MyPageScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* 프리미엄 상태 */}
+        {isPremium ? (
+          <View style={styles.premiumBadgeRow}>
+            <Text style={styles.premiumBadgeTxt}>✨ 프리미엄 구독 중</Text>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.upgradeBanner} onPress={() => router.push('/paywall' as any)}>
+            <Text style={styles.upgradeTxt}>✨ 프리미엄으로 업그레이드</Text>
+            <Text style={styles.upgradeChevron}>›</Text>
+          </TouchableOpacity>
+        )}
+
         {/* 반려동물 */}
         <Text style={styles.sectionTitle}>나의 반려동물</Text>
 
@@ -229,7 +275,12 @@ export default function MyPageScreen() {
             const age = formatAge(pet.birthday);
             const genderLabel = pet.gender === 'male' ? '♂' : pet.gender === 'female' ? '♀' : null;
             return (
-              <View key={pet.id} style={styles.petCard}>
+              <TouchableOpacity
+                key={pet.id}
+                style={styles.petCard}
+                onPress={() => router.push(`/pet/${pet.id}` as any)}
+                activeOpacity={0.85}
+              >
                 <TouchableOpacity style={styles.petAvatar} onPress={() => handleChangePetPhoto(pet.id)} activeOpacity={0.8}>
                   {uploadingPhotoId === pet.id ? (
                     <ActivityIndicator color={Colors.primary} />
@@ -258,14 +309,8 @@ export default function MyPageScreen() {
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity
-                  style={styles.petDeleteBtn}
-                  onPress={() => handleDeletePet(pet.id, pet.name)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Text style={styles.petDeleteTxt}>🗑</Text>
-                </TouchableOpacity>
-              </View>
+                <Text style={{ fontSize: 18, color: Colors.light }}>›</Text>
+              </TouchableOpacity>
             );
           })
         )}
@@ -273,10 +318,18 @@ export default function MyPageScreen() {
         {/* 반려동물 추가 */}
         <TouchableOpacity
           style={styles.addPetBtn}
-          onPress={() => router.push('/(onboarding)/register-pet')}
+          onPress={() => {
+            if (!isPremium && pets.length >= 1) {
+              router.push('/paywall' as any);
+            } else {
+              router.push('/(onboarding)/register-pet');
+            }
+          }}
         >
           <Text style={styles.addPetPlus}>+</Text>
-          <Text style={styles.addPetLabel}>반려동물 추가하기</Text>
+          <Text style={styles.addPetLabel}>
+            {!isPremium && pets.length >= 1 ? '반려동물 추가 (프리미엄)' : '반려동물 추가하기'}
+          </Text>
         </TouchableOpacity>
 
         {/* 패밀리 그룹 */}
@@ -352,7 +405,11 @@ export default function MyPageScreen() {
               key={i}
               style={[styles.menuRow, i < STATIC_MENU.length - 1 && styles.menuDivider]}
               activeOpacity={0.7}
-              onPress={item.label === '앱 설정' ? () => router.push('/settings') : undefined}
+              onPress={
+              item.label === '앱 설정' ? () => router.push('/settings') :
+              item.label === '월간 건강 리포트' ? () => router.push('/health-report' as any) :
+              undefined
+            }
             >
               <Text style={styles.menuEmoji}>{item.emoji}</Text>
               <View style={{ flex: 1 }}>
@@ -657,4 +714,20 @@ const styles = StyleSheet.create({
     fontSize: 15, color: Colors.text,
     marginTop: 4,
   },
+
+  premiumBadgeRow: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 14, paddingVertical: 8,
+    alignSelf: 'flex-start',
+  },
+  premiumBadgeTxt: { fontSize: 13, fontWeight: '700', color: Colors.primary },
+  upgradeBanner: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.card,
+    paddingHorizontal: 16, paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  upgradeTxt: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  upgradeChevron: { fontSize: 20, color: Colors.primary },
 });

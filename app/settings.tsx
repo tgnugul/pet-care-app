@@ -96,7 +96,7 @@ export default function SettingsScreen() {
                 value={pickerTime}
                 mode="time"
                 display="compact"
-                minuteInterval={60}
+                minuteInterval={30}
                 onChange={(_: DateTimePickerEvent, d?: Date) => {
                   if (d) { setPickerTime(d); handleSaveSummaryHour(d.getHours()); }
                 }}
@@ -117,8 +117,7 @@ export default function SettingsScreen() {
                 <DateTimePicker
                   value={pickerTime}
                   mode="time"
-                  display="default"
-                  minuteInterval={60}
+                  minuteInterval={30}
                   onChange={(_: DateTimePickerEvent, d?: Date) => {
                     setShowAndroidPicker(false);
                     if (d) { setPickerTime(d); handleSaveSummaryHour(d.getHours()); }

@@ -134,8 +134,11 @@ export default function WalkScreen() {
             <TouchableOpacity
               key={log.id}
               style={styles.walkCard}
-              activeOpacity={editMode ? 0.7 : 1}
-              onPress={editMode ? () => toggleSelect(log.id) : undefined}
+              activeOpacity={0.7}
+              onPress={() => {
+                if (editMode) toggleSelect(log.id);
+                else router.push({ pathname: '/walk-detail', params: { id: log.id } });
+              }}
             >
               {editMode && (
                 <View style={[styles.checkbox, selectedIds.has(log.id) && styles.checkboxOn]}>

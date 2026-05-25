@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
 
 const KEY_SUMMARY_HOUR = 'notif_summary_hour';
 const KEY_FAMILY_NOTIF = 'notif_family_enabled';
@@ -44,6 +45,7 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
   setCareNotifPaused: async (val) => {
     await SecureStore.setItemAsync(KEY_CARE_PAUSED, String(val));
     set({ careNotifPaused: val });
+    if (val) await Notifications.cancelAllScheduledNotificationsAsync();
   },
 }));
 

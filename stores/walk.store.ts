@@ -58,8 +58,6 @@ export function calcMonthStats(logs: WalkLog[]): WalkMonthStats {
   return { totalDistanceKm, count: monthLogs.length, avgMinutes };
 }
 
-const WALK_EMOJIS = ['🌅', '🌿', '☀️', '🌙', '🌈', '🍃', '🌸'];
-
 export function walkEmoji(log: WalkLog): string {
   const h = new Date(log.started_at).getHours();
   if (h >= 5 && h < 8) return '🌅';

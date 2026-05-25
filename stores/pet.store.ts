@@ -14,12 +14,15 @@ export interface Pet {
   profile_photo_url: string | null;
 }
 
+type PetUpdateFields = Partial<Omit<Pet, 'id' | 'user_id'>>;
+
 interface PetStore {
   pets: Pet[];
   loading: boolean;
   fetchPets: () => Promise<void>;
   deletePet: (id: string) => Promise<void>;
   updatePetPhoto: (id: string, url: string) => Promise<void>;
+  updatePet: (id: string, fields: PetUpdateFields) => Promise<boolean>;
 }
 
 export const usePetStore = create<PetStore>((set) => ({
@@ -46,6 +49,14 @@ export const usePetStore = create<PetStore>((set) => ({
   updatePetPhoto: async (id, url) => {
     await supabase.from('pets').update({ profile_photo_url: url }).eq('id', id);
     set(s => ({ pets: s.pets.map(p => p.id === id ? { ...p, profile_photo_url: url } : p) }));
+  },
+
+  updatePet: async (id, fields) => {
+    const { error } = await supabase.from('pets').update(fields).eq('id', id);
+    if (!error) {
+      set(s => ({ pets: s.pets.map(p => p.id === id ? { ...p, ...fields } : p) }));
+    }
+    return !error;
   },
 }));
 

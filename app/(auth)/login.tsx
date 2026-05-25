@@ -1,26 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import { makeRedirectUri } from 'expo-auth-session';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { Colors, Radius, Shadow } from '@/constants/design';
 
 WebBrowser.maybeCompleteAuthSession();
+
+const SAVED_EMAIL_KEY = 'pawmate_saved_email';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<'google' | 'kakao' | null>(null);
+  const [rememberEmail, setRememberEmail] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(SAVED_EMAIL_KEY).then(saved => {
+      if (saved) {
+        setEmail(saved);
+        setRememberEmail(true);
+      }
+    });
+  }, []);
 
   async function handleSocialLogin(provider: 'google' | 'kakao') {
     setSocialLoading(provider);
-    const redirectTo = Linking.createURL('/');
+    const redirectTo = 'pawmate://';
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -33,15 +45,8 @@ export default function LoginScreen() {
       return;
     }
 
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    await WebBrowser.openBrowserAsync(data.url);
     setSocialLoading(null);
-
-    if (result.type === 'success' && result.url) {
-      const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url);
-      if (!sessionError) {
-        router.replace('/(tabs)');
-      }
-    }
   }
 
   async function handleLogin() {
@@ -52,6 +57,11 @@ export default function LoginScreen() {
     if (error) {
       Alert.alert('로그인 실패', '이메일 또는 비밀번호를 확인해주세요.');
     } else {
+      if (rememberEmail) {
+        await AsyncStorage.setItem(SAVED_EMAIL_KEY, email.trim());
+      } else {
+        await AsyncStorage.removeItem(SAVED_EMAIL_KEY);
+      }
       router.replace('/(tabs)');
     }
   }
@@ -77,14 +87,26 @@ export default function LoginScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <TextInput
-            style={styles.input}
-            placeholder="비밀번호"
-            placeholderTextColor={Colors.light}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              placeholder="비밀번호"
+              placeholderTextColor={Colors.light}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword(v => !v)}>
+              <Text style={styles.eyeText}>{showPassword ? '숨김' : '표시'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity style={styles.checkRow} onPress={() => setRememberEmail(v => !v)}>
+            <View style={[styles.checkbox, rememberEmail && styles.checkboxOn]}>
+              {rememberEmail && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.checkLabel}>아이디 기억</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.loginBtn, (!email || !password || loading) && styles.btnDisabled]}
@@ -176,6 +198,25 @@ const styles = StyleSheet.create({
     fontSize: 15, color: Colors.text,
     backgroundColor: Colors.bg,
   },
+
+  passwordRow: { position: 'relative' },
+  passwordInput: { paddingRight: 64 },
+  eyeBtn: {
+    position: 'absolute', right: 14, top: 0, bottom: 0,
+    justifyContent: 'center',
+  },
+  eyeText: { fontSize: 13, color: Colors.sub, fontWeight: '600' },
+
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: -4 },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 5,
+    borderWidth: 1.5, borderColor: Colors.border,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.bg,
+  },
+  checkboxOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  checkmark: { fontSize: 12, color: Colors.white, fontWeight: '800' },
+  checkLabel: { fontSize: 14, color: Colors.sub },
 
   loginBtn: {
     backgroundColor: Colors.primary,

@@ -1,6 +1,11 @@
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Radius, Shadow } from '@/constants/design';
+
+async function markOnboardingSeen() {
+  await AsyncStorage.setItem('onboarding_seen', 'true');
+}
 
 export default function WelcomeScreen() {
   return (
@@ -16,7 +21,7 @@ export default function WelcomeScreen() {
           <TouchableOpacity
             style={styles.choiceYes}
             activeOpacity={0.85}
-            onPress={() => router.push('/(onboarding)/register-pet')}
+            onPress={() => { markOnboardingSeen(); router.push('/(onboarding)/register-pet'); }}
           >
             <Text style={styles.choiceEmoji}>🐶</Text>
             <Text style={styles.choiceYesLabel}>네, 키우고 있어요</Text>
@@ -26,7 +31,7 @@ export default function WelcomeScreen() {
           <TouchableOpacity
             style={styles.choiceNo}
             activeOpacity={0.85}
-            onPress={() => router.push('/(onboarding)/survey')}
+            onPress={() => { markOnboardingSeen(); router.push('/(onboarding)/survey'); }}
           >
             <Text style={styles.choiceEmoji}>🤔</Text>
             <Text style={styles.choiceNoLabel}>아직 없어요</Text>

@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   SafeAreaView, ScrollView, Alert, ActivityIndicator, Switch, Image,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import { Colors, Radius, Shadow } from '@/constants/design';
-import { usePetStore } from '@/stores/pet.store';
+import { usePetStore, Pet } from '@/stores/pet.store';
 
 function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64);
@@ -17,7 +17,7 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes;
 }
 
-type Species = 'dog' | 'cat' | 'rabbit' | 'bird' | 'fish' | 'other';
+type Species = Pet['species'];
 type Gender = 'male' | 'female' | null;
 
 const SPECIES_OPTIONS: { value: Species; label: string; emoji: string }[] = [
@@ -29,7 +29,11 @@ const SPECIES_OPTIONS: { value: Species; label: string; emoji: string }[] = [
   { value: 'other', label: '기타', emoji: '🐾' },
 ];
 
-export default function RegisterPetScreen() {
+export default function PetEditScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { pets, updatePet } = usePetStore();
+  const pet = pets.find(p => p.id === id);
+
   const [name, setName] = useState('');
   const [species, setSpecies] = useState<Species>('dog');
   const [breed, setBreed] = useState('');
@@ -37,17 +41,29 @@ export default function RegisterPetScreen() {
   const [gender, setGender] = useState<Gender>(null);
   const [weight, setWeight] = useState('');
   const [neutered, setNeutered] = useState(false);
-  const [profilePhotoUri, setProfilePhotoUri] = useState<string | null>(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const { fetchPets } = usePetStore();
+
+  useEffect(() => {
+    if (!pet) return;
+    setName(pet.name);
+    setSpecies(pet.species);
+    setBreed(pet.breed ?? '');
+    setBirthday(pet.birthday ?? '');
+    setGender(pet.gender ?? null);
+    setWeight(pet.weight != null ? String(pet.weight) : '');
+    setNeutered(pet.neutered);
+    setExistingPhotoUrl(pet.profile_photo_url);
+  }, [pet?.id]);
 
   function pickPhoto() {
     const buttons: Parameters<typeof Alert.alert>[2] = [
       { text: '카메라로 촬영', onPress: pickFromCamera },
       { text: '앨범에서 선택', onPress: pickFromGallery },
     ];
-    if (profilePhotoUri) {
-      buttons.push({ text: '사진 제거', style: 'destructive', onPress: () => setProfilePhotoUri(null) });
+    if (photoUri ?? existingPhotoUrl) {
+      buttons.push({ text: '사진 제거', style: 'destructive', onPress: () => { setPhotoUri(null); setExistingPhotoUrl(null); } });
     }
     buttons.push({ text: '취소', style: 'cancel' });
     Alert.alert('프로필 사진', '사진을 선택하는 방법을 선택해주세요', buttons);
@@ -55,39 +71,24 @@ export default function RegisterPetScreen() {
 
   async function pickFromCamera() {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('권한 필요', '카메라 접근 권한이 필요해요.');
-      return;
-    }
+    if (status !== 'granted') { Alert.alert('권한 필요', '카메라 접근 권한이 필요해요.'); return; }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
     });
-    if (!result.canceled) setProfilePhotoUri(result.assets[0].uri);
+    if (!result.canceled) setPhotoUri(result.assets[0].uri);
   }
 
   async function pickFromGallery() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('권한 필요', '사진 접근 권한이 필요해요.');
-      return;
-    }
+    if (status !== 'granted') { Alert.alert('권한 필요', '사진 접근 권한이 필요해요.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
     });
-    if (!result.canceled) setProfilePhotoUri(result.assets[0].uri);
+    if (!result.canceled) setPhotoUri(result.assets[0].uri);
   }
 
   async function handleSave() {
-    if (!name.trim()) {
-      Alert.alert('이름을 입력해주세요');
-      return;
-    }
+    if (!name.trim()) { Alert.alert('이름을 입력해주세요'); return; }
     if (birthday.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(birthday.trim())) {
       Alert.alert('날짜 형식 오류', 'YYYY-MM-DD 형식으로 입력해주세요. 예) 2022-03-15');
       return;
@@ -98,35 +99,32 @@ export default function RegisterPetScreen() {
     }
 
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      Alert.alert('오류', '로그인 정보를 찾을 수 없어요.');
-      setLoading(false);
-      return;
-    }
 
-    let profilePhotoUrl: string | null = null;
-    if (profilePhotoUri) {
-      const resized = await manipulateAsync(
-        profilePhotoUri,
-        [{ resize: { width: 400, height: 400 } }],
-        { compress: 0.8, format: SaveFormat.JPEG, base64: true },
-      );
-      const filePath = `${session.user.id}/${Date.now()}.jpg`;
-      const bytes = base64ToBytes(resized.base64 ?? '');
-      const { error: uploadError } = await supabase.storage
-        .from('pet-photos')
-        .upload(filePath, bytes, { contentType: 'image/jpeg', upsert: true });
-      if (uploadError) {
-        Alert.alert('사진 업로드 실패', '사진을 저장하지 못했어요. 나머지 정보는 저장됩니다.');
-      } else {
-        const { data: urlData } = supabase.storage.from('pet-photos').getPublicUrl(filePath);
-        profilePhotoUrl = urlData.publicUrl;
+    let profilePhotoUrl: string | null = existingPhotoUrl;
+
+    if (photoUri) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const resized = await manipulateAsync(
+          photoUri,
+          [{ resize: { width: 400, height: 400 } }],
+          { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+        );
+        const filePath = `${session.user.id}/${Date.now()}.jpg`;
+        const bytes = base64ToBytes(resized.base64 ?? '');
+        const { error: uploadError } = await supabase.storage
+          .from('pet-photos')
+          .upload(filePath, bytes, { contentType: 'image/jpeg', upsert: true });
+        if (uploadError) {
+          Alert.alert('사진 업로드 실패', '사진을 저장하지 못했어요. 나머지 정보는 저장됩니다.');
+        } else {
+          const { data: urlData } = supabase.storage.from('pet-photos').getPublicUrl(filePath);
+          profilePhotoUrl = urlData.publicUrl;
+        }
       }
     }
 
-    const { error } = await supabase.from('pets').insert({
-      user_id: session.user.id,
+    const ok = await updatePet(id!, {
       name: name.trim(),
       species,
       breed: breed.trim() || null,
@@ -139,29 +137,39 @@ export default function RegisterPetScreen() {
 
     setLoading(false);
 
-    if (error) {
-      Alert.alert('저장 실패', '잠시 후 다시 시도해주세요.');
+    if (ok) {
+      router.back();
     } else {
-      await fetchPets();
-      router.replace('/(tabs)');
+      Alert.alert('저장 실패', '잠시 후 다시 시도해주세요.');
     }
   }
+
+  const displayPhoto = photoUri ?? existingPhotoUrl;
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>반려동물 등록</Text>
-        <Text style={styles.sub}>아이의 정보를 입력해주세요</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backBtnText}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>반려동물 수정</Text>
+        <View style={styles.backBtn} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* 프로필 사진 */}
         <TouchableOpacity style={styles.photoPickerWrap} onPress={pickPhoto} activeOpacity={0.8}>
-          {profilePhotoUri ? (
-            <Image source={{ uri: profilePhotoUri }} style={styles.photoPreview} />
+          {displayPhoto ? (
+            <Image source={{ uri: displayPhoto }} style={styles.photoPreview} />
           ) : (
-            <Image source={require('@/assets/images/camera-add.png')} style={styles.photoPreview} />
+            <View style={styles.photoPlaceholder}>
+              <Text style={styles.photoPlaceholderText}>📷</Text>
+              <Text style={styles.photoPlaceholderSub}>사진 추가</Text>
+            </View>
           )}
+          <View style={styles.photoEditBadge}>
+            <Text style={styles.photoEditBadgeText}>✎</Text>
+          </View>
         </TouchableOpacity>
 
         {/* 종류 */}
@@ -243,7 +251,7 @@ export default function RegisterPetScreen() {
         {/* 중성화 */}
         <View style={styles.switchRow}>
           <View>
-            <Text style={styles.label} >중성화 여부</Text>
+            <Text style={styles.label}>중성화 여부</Text>
             <Text style={styles.switchSub}>중성화 수술을 했나요?</Text>
           </View>
           <Switch
@@ -254,7 +262,6 @@ export default function RegisterPetScreen() {
           />
         </View>
 
-        {/* 저장 버튼 */}
         <TouchableOpacity
           style={[styles.saveBtn, (!name.trim() || loading) && styles.saveBtnDisabled]}
           onPress={handleSave}
@@ -262,12 +269,8 @@ export default function RegisterPetScreen() {
         >
           {loading
             ? <ActivityIndicator color={Colors.white} />
-            : <Text style={styles.saveBtnText}>등록하기</Text>
+            : <Text style={styles.saveBtnText}>수정 저장</Text>
           }
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.skipBtn} onPress={() => router.replace('/(tabs)')}>
-          <Text style={styles.skipBtnText}>나중에 등록할게요</Text>
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
@@ -280,17 +283,33 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
 
   header: {
-    backgroundColor: Colors.white,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: Colors.bg,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14,
   },
-  title: { fontSize: 22, fontWeight: '800', color: Colors.text },
-  sub: { fontSize: 13, color: Colors.sub, marginTop: 4 },
+  backBtn: { width: 48, height: 40, alignItems: 'center', justifyContent: 'center' },
+  backBtnText: { fontSize: 28, color: Colors.text, lineHeight: 32 },
+  title: { fontSize: 17, fontWeight: '700', color: Colors.text },
 
   content: { padding: 20, gap: 8 },
 
-  photoPickerWrap: { alignSelf: 'center', marginTop: 8, marginBottom: 4 },
+  photoPickerWrap: { alignSelf: 'center', marginTop: 8, marginBottom: 4, position: 'relative' },
   photoPreview: { width: 96, height: 96, borderRadius: 48 },
+  photoPlaceholder: {
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: Colors.primaryLight,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoPlaceholderText: { fontSize: 28 },
+  photoPlaceholderSub: { fontSize: 11, color: Colors.primary, marginTop: 2 },
+  photoEditBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: Colors.primary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoEditBadgeText: { color: Colors.white, fontSize: 13 },
 
   label: { fontSize: 13, fontWeight: '700', color: Colors.sub, marginTop: 8 },
   optional: { fontWeight: '400', color: Colors.light },
@@ -354,7 +373,4 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { backgroundColor: Colors.light, shadowOpacity: 0 },
   saveBtnText: { fontSize: 16, fontWeight: '800', color: Colors.white },
-
-  skipBtn: { alignItems: 'center', paddingVertical: 12 },
-  skipBtnText: { fontSize: 13, color: Colors.light },
 });

@@ -59,10 +59,13 @@ export function calcNextDue(frequency: Frequency, daysOfWeek?: number[] | null, 
   return d.toISOString();
 }
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
+export function localDateStr(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export function isDoneToday(schedule: CareSchedule): boolean {
-  return !!schedule.last_done_at && schedule.last_done_at.slice(0, 10) === todayStr();
+  if (!schedule.last_done_at) return false;
+  return localDateStr(new Date(schedule.last_done_at)) === localDateStr();
 }
 
 export const CARE_TYPE_META: Record<CareType, { emoji: string; label: string }> = {
@@ -75,7 +78,7 @@ export const CARE_TYPE_META: Record<CareType, { emoji: string; label: string }> 
   other:        { emoji: '🐾', label: '기타' },
 };
 
-export const CARE_TYPE_IMAGES: Record<CareType, ReturnType<typeof require>> = {
+export const CARE_TYPE_IMAGES: Record<CareType, number> = {
   meal:         require('@/assets/images/care/meal.png'),
   medicine:     require('@/assets/images/care/medicine.png'),
   hospital:     require('@/assets/images/care/hospital.png'),
@@ -112,16 +115,37 @@ export const useCareStore = create<ScheduleStore>((set, get) => ({
 
   markDone: async (id, frequency) => {
     const sc = get().schedules.find(s => s.id === id);
-    const now = new Date().toISOString();
-    const nextDue = calcNextDue(frequency, sc?.days_of_week, sc?.next_due_at);
+    if (!sc) return;
+    const now = new Date();
+    const nowISO = now.toISOString();
+    const nextDue = calcNextDue(frequency, sc.days_of_week, sc.next_due_at);
     const { error } = await supabase
       .from('care_schedules')
-      .update({ last_done_at: now, next_due_at: nextDue })
+      .update({ last_done_at: nowISO, next_due_at: nextDue })
       .eq('id', id);
     if (!error) {
+      // 케어 완료 기록 (지연 일수 포함)
+      const scheduledDate = new Date(sc.next_due_at);
+      const delayDays = Math.max(0, Math.floor(
+        (Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) -
+         Date.UTC(scheduledDate.getFullYear(), scheduledDate.getMonth(), scheduledDate.getDate())) / 86400000,
+      ));
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData?.user) {
+        await supabase.from('care_completions').insert({
+          schedule_id: sc.id,
+          pet_id: sc.pet_id,
+          user_id: userData.user.id,
+          care_type: sc.type,
+          care_label: sc.label,
+          scheduled_at: sc.next_due_at,
+          done_at: nowISO,
+          delay_days: delayDays,
+        });
+      }
       set(s => {
         const updated = s.schedules.map(sc =>
-          sc.id === id ? { ...sc, last_done_at: now, next_due_at: nextDue } : sc,
+          sc.id === id ? { ...sc, last_done_at: nowISO, next_due_at: nextDue } : sc,
         );
         const petName = usePetStore.getState().pets[0]?.name ?? '반려동물';
         const schedule = updated.find(sc => sc.id === id);

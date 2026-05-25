@@ -1,17 +1,215 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, Alert,
+  SafeAreaView, Alert, Platform,
 } from 'react-native';
 import { router } from 'expo-router';
-import MapView, { Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
+import { WebView } from 'react-native-webview';
 import { calcDistance, formatDuration } from '@/lib/gps';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { supabase } from '@/lib/supabase';
 import { useWalkStore } from '@/stores/walk.store';
 
 type Coord = { latitude: number; longitude: number };
+
+// iOS: Apple Maps (API 키 불필요). Android: Google Maps API 키 필요.
+const USE_NATIVE_MAP = Platform.OS === 'ios' || !!(process.env.EXPO_PUBLIC_GOOGLE_MAPS_ANDROID_KEY);
+
+const LEAFLET_HTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; background: #e8f0e8; }
+    #map { height: 100vh; width: 100%; }
+    .loading {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: #e8f0e8; font-family: sans-serif;
+      color: #888; gap: 12px; z-index: 9999;
+    }
+    .loading-dot {
+      width: 48px; height: 48px;
+      border: 4px solid #F5A623;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="loading" class="loading">
+    <div class="loading-dot"></div>
+    <span>지도 불러오는 중...</span>
+  </div>
+  <div id="map"></div>
+  <script>
+    var map = null;
+    var routeLine = null;
+    var userMarker = null;
+    var accuracyCircle = null;
+    var initialized = false;
+
+    function initMap(lat, lng) {
+      if (initialized) return;
+      initialized = true;
+
+      document.getElementById('loading').style.display = 'none';
+
+      map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false,
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+      }).addTo(map);
+
+      map.setView([lat, lng], 17);
+
+      routeLine = L.polyline([], {
+        color: '#6DB56D',
+        weight: 5,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(map);
+
+      userMarker = L.circleMarker([lat, lng], {
+        radius: 10,
+        fillColor: '#F5A623',
+        color: '#fff',
+        weight: 3,
+        fillOpacity: 1,
+      }).addTo(map);
+    }
+
+    function updateMap(lat, lng, route, accuracy) {
+      if (!initialized) {
+        initMap(lat, lng);
+        return;
+      }
+
+      var latlng = [lat, lng];
+      map.setView(latlng, map.getZoom(), { animate: true, duration: 0.5 });
+      userMarker.setLatLng(latlng);
+
+      if (route && route.length > 1) {
+        var latlngs = route.map(function(c) { return [c.latitude, c.longitude]; });
+        routeLine.setLatLngs(latlngs);
+      }
+    }
+
+    function handleMessage(event) {
+      try {
+        var data = JSON.parse(event.data);
+        if (data.type === 'init') {
+          initMap(data.latitude, data.longitude);
+        } else if (data.type === 'update') {
+          updateMap(data.latitude, data.longitude, data.route, data.accuracy);
+        }
+      } catch (e) {}
+    }
+
+    document.addEventListener('message', handleMessage);
+    window.addEventListener('message', handleMessage);
+  </script>
+</body>
+</html>`;
+
+function LeafletMapSection({ region, route, webViewRef }: {
+  region: { latitude: number; longitude: number } | null;
+  route: Coord[];
+  webViewRef: React.MutableRefObject<any>;
+}) {
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!loaded || !region || !webViewRef.current) return;
+    webViewRef.current.postMessage(JSON.stringify({
+      type: 'init',
+      latitude: region.latitude,
+      longitude: region.longitude,
+    }));
+  }, [loaded]);
+
+  useEffect(() => {
+    if (!loaded || !region || !webViewRef.current) return;
+    webViewRef.current.postMessage(JSON.stringify({
+      type: 'update',
+      latitude: region.latitude,
+      longitude: region.longitude,
+      route,
+    }));
+  }, [region, route]);
+
+  return (
+    <WebView
+      ref={webViewRef}
+      source={{ html: LEAFLET_HTML }}
+      style={styles.map}
+      javaScriptEnabled
+      originWhitelist={['*']}
+      onLoadEnd={() => setLoaded(true)}
+    />
+  );
+}
+
+function NativeMapSection({ region, route, mapRef }: {
+  region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null;
+  route: Coord[];
+  mapRef: React.MutableRefObject<any>;
+}) {
+  if (!region) {
+    return (
+      <View style={[styles.map, styles.mapPlaceholder]}>
+        <Text style={styles.mapPlaceholderText}>📍 위치 확인 중...</Text>
+      </View>
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { default: MapView, Polyline } = require('react-native-maps');
+  return (
+    <MapView
+      ref={mapRef}
+      style={styles.map}
+      initialRegion={region}
+      showsUserLocation
+      showsMyLocationButton={false}
+      scrollEnabled={false}
+      rotateEnabled={false}
+    >
+      {route.length > 1 && (
+        <Polyline
+          coordinates={route}
+          strokeColor={Colors.accent}
+          strokeWidth={5}
+          lineCap="round"
+          lineJoin="round"
+        />
+      )}
+    </MapView>
+  );
+}
+
+function MapSection({ region, route, mapRef, webViewRef }: {
+  region: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null;
+  route: Coord[];
+  mapRef: React.MutableRefObject<any>;
+  webViewRef: React.MutableRefObject<any>;
+}) {
+  if (USE_NATIVE_MAP) {
+    return <NativeMapSection region={region} route={route} mapRef={mapRef} />;
+  }
+  return <LeafletMapSection region={region} route={route} webViewRef={webViewRef} />;
+}
 
 export default function WalkActiveScreen() {
   const { fetchLogs } = useWalkStore();
@@ -28,8 +226,9 @@ export default function WalkActiveScreen() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const locationSub = useRef<Location.LocationSubscription | null>(null);
   const lastCoord = useRef<Coord | null>(null);
-  const mapRef = useRef<MapView>(null);
   const startedAt = useRef<string | null>(null);
+  const mapRef = useRef<any>(null);
+  const webViewRef = useRef<any>(null);
 
   function stopAll() {
     timerRef.current && clearInterval(timerRef.current);
@@ -78,9 +277,10 @@ export default function WalkActiveScreen() {
         }
         lastCoord.current = next;
         setRoute(prev => [...prev, next]);
-        mapRef.current?.animateToRegion(
-          { ...next, latitudeDelta: 0.003, longitudeDelta: 0.003 },
-          300,
+        setRegion(r => r ? { ...r, latitude: next.latitude, longitude: next.longitude } : null);
+        mapRef.current?.animateCamera(
+          { center: { latitude: next.latitude, longitude: next.longitude } },
+          { duration: 500 },
         );
       },
     );
@@ -90,7 +290,7 @@ export default function WalkActiveScreen() {
     stopAll();
     const endedAt = new Date().toISOString();
     const { data: { session } } = await supabase.auth.getSession();
-    if (session && distance > 0) {
+    if (session && elapsed > 0) {
       await supabase.from('walk_logs').insert({
         user_id: session.user.id,
         started_at: startedAt.current ?? endedAt,
@@ -122,32 +322,7 @@ export default function WalkActiveScreen() {
 
   return (
     <View style={styles.container}>
-      {region ? (
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          provider={PROVIDER_DEFAULT}
-          initialRegion={region}
-          showsUserLocation
-          showsMyLocationButton={false}
-          scrollEnabled={false}
-          rotateEnabled={false}
-        >
-          {route.length > 1 && (
-            <Polyline
-              coordinates={route}
-              strokeColor={Colors.primary}
-              strokeWidth={5}
-              lineCap="round"
-              lineJoin="round"
-            />
-          )}
-        </MapView>
-      ) : (
-        <View style={[styles.map, styles.mapPlaceholder]}>
-          <Text style={styles.mapPlaceholderText}>📍 위치 확인 중...</Text>
-        </View>
-      )}
+      <MapSection region={region} route={route} mapRef={mapRef} webViewRef={webViewRef} />
 
       <SafeAreaView style={styles.overlay} pointerEvents="box-none">
         <TouchableOpacity style={styles.closeBtn} onPress={handleClose}>
@@ -188,14 +363,14 @@ export default function WalkActiveScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
 
-  map: { position: 'absolute', inset: 0 },
+  map: { flex: 1 },
   mapPlaceholder: {
     backgroundColor: '#e8f0e8',
     alignItems: 'center', justifyContent: 'center',
   },
   mapPlaceholderText: { fontSize: 16, color: Colors.sub },
 
-  overlay: { flex: 1, justifyContent: 'space-between' },
+  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'space-between' },
 
   closeBtn: {
     alignSelf: 'flex-end',

@@ -5,8 +5,8 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/design';
-import { usePetStore } from '@/stores/pet.store';
-import { useCareStore, isDoneToday } from '@/stores/schedule.store';
+import { usePetStore, Pet } from '@/stores/pet.store';
+import { useCareStore, isDoneToday, CareSchedule } from '@/stores/schedule.store';
 
 interface RecommendCard {
   id: string;
@@ -21,8 +21,8 @@ interface RecommendCard {
 }
 
 function buildCards(
-  pet: ReturnType<typeof usePetStore>['pets'][0] | null,
-  schedules: ReturnType<typeof useCareStore>['schedules'],
+  pet: Pet | null,
+  schedules: CareSchedule[],
 ): RecommendCard[] {
   const cards: RecommendCard[] = [];
 
@@ -69,7 +69,7 @@ function buildCards(
 
   // 3. 사료 정기구독 추천 (상시)
   if (pet) {
-    const isSmall = pet.weight && parseFloat(pet.weight) < 10;
+    const isSmall = pet.weight !== null && pet.weight < 10;
     cards.push({
       id: 'food',
       emoji: '🍚',

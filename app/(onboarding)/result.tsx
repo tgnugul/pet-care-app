@@ -1,5 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { getBreedRecommendations } from '@/lib/recommendation';
 import { SurveyAnswers, BreedRecommendation } from '@/types/breed';
 
@@ -85,15 +86,27 @@ export default function ResultScreen() {
           <BreedCard key={item.breed.id} item={item} rank={i} />
         ))}
 
+        <TouchableOpacity
+          style={styles.adoptButton}
+          onPress={() => WebBrowser.openBrowserAsync('https://www.animal.go.kr/front/adopt/adoptablePetList.do')}
+        >
+          <Text style={styles.adoptText}>🏠 입양 정보 찾기</Text>
+          <Text style={styles.adoptSub}>동물보호관리시스템에서 입양 가능한 아이를 찾아보세요</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.registerButton}
+          onPress={() => router.push('/(onboarding)/register-pet')}
+        >
+          <Text style={styles.registerText}>반려동물 등록하기 →</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
           <Text style={styles.retryText}>다시 설문하기</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.continueButton}
-          onPress={() => router.replace('/(tabs)')}
-        >
-          <Text style={styles.continueText}>반려동물 등록하러 가기 →</Text>
+        <TouchableOpacity style={styles.laterButton} onPress={() => router.replace('/(tabs)')}>
+          <Text style={styles.laterText}>나중에 등록할게요</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -140,9 +153,20 @@ const styles = StyleSheet.create({
   adoptBadge: { marginTop: 10, backgroundColor: '#FFF8E1', borderRadius: 10, padding: 10, alignItems: 'center' },
   adoptText: { fontSize: 13, color: '#F57F17', fontWeight: '600' },
 
-  retryButton: { borderWidth: 1.5, borderColor: '#ddd', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 8, marginBottom: 12 },
+  adoptButton: {
+    backgroundColor: '#FFF8E1', borderRadius: 14, padding: 18,
+    alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 10,
+    borderWidth: 1.5, borderColor: '#F9A825',
+  },
+  adoptText: { fontSize: 17, fontWeight: '700', color: '#F57F17' },
+  adoptSub: { fontSize: 12, color: '#888', textAlign: 'center' },
+
+  registerButton: { backgroundColor: '#4A90E2', borderRadius: 14, padding: 18, alignItems: 'center', marginBottom: 10 },
+  registerText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+
+  retryButton: { borderWidth: 1.5, borderColor: '#ddd', borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 10 },
   retryText: { fontSize: 16, color: '#666', fontWeight: '500' },
 
-  continueButton: { backgroundColor: '#4A90E2', borderRadius: 14, padding: 18, alignItems: 'center' },
-  continueText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  laterButton: { alignItems: 'center', paddingVertical: 12 },
+  laterText: { fontSize: 14, color: '#aaa' },
 });

@@ -6,7 +6,7 @@ import {
 import { router } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { usePetStore } from '@/stores/pet.store';
-import { useCareStore, CARE_TYPE_META, CARE_TYPE_IMAGES, isDoneToday, CareSchedule, Frequency } from '@/stores/schedule.store';
+import { useCareStore, CARE_TYPE_META, CARE_TYPE_IMAGES, isDoneToday, localDateStr, CareSchedule, Frequency } from '@/stores/schedule.store';
 
 type Tab = 'today' | 'week' | 'all';
 const TABS: { id: Tab; label: string }[] = [
@@ -31,7 +31,7 @@ function isToday(dateStr: string): boolean {
 function filterByTab(schedules: CareSchedule[], tab: Tab): CareSchedule[] {
   if (tab === 'all') return schedules;
   if (tab === 'today') {
-    return schedules.filter(s => s.frequency === 'daily' || isToday(s.next_due_at));
+    return schedules.filter(s => s.frequency === 'daily' || localDateStr(new Date(s.next_due_at)) <= localDateStr());
   }
   return schedules.filter(s =>
     s.frequency === 'daily' || s.frequency === 'weekly' || isThisWeek(s.next_due_at),

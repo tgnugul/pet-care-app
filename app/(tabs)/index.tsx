@@ -3,26 +3,28 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, Act
 import { router } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { usePetStore, SPECIES_EMOJI, formatDPlus } from '@/stores/pet.store';
-import { useCareStore, CARE_TYPE_META, CARE_TYPE_IMAGES, isDoneToday, CareSchedule, Frequency } from '@/stores/schedule.store';
+import { useCareStore, CARE_TYPE_META, CARE_TYPE_IMAGES, isDoneToday, localDateStr, CareSchedule, Frequency } from '@/stores/schedule.store';
 
-const today = new Date();
 const DAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
-const dateStr = `${today.getMonth() + 1}월 ${today.getDate()}일 ${DAY_KO[today.getDay()]}요일`;
-const todayStr = today.toISOString().slice(0, 10);
+
+function getNow() {
+  return new Date();
+}
 
 function isTodaySchedule(s: CareSchedule) {
-  return s.frequency === 'daily' || s.next_due_at.slice(0, 10) === todayStr;
+  const todayStr = localDateStr();
+  return s.frequency === 'daily' || localDateStr(new Date(s.next_due_at)) <= todayStr;
 }
 
 function isUpcoming(s: CareSchedule) {
   if (s.frequency === 'daily') return false;
   const due = new Date(s.next_due_at);
-  const dayDiff = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+  const dayDiff = Math.ceil((due.getTime() - getNow().getTime()) / 86400000);
   return dayDiff > 0 && dayDiff <= 30;
 }
 
 function formatDaysUntil(iso: string): string {
-  const diff = Math.ceil((new Date(iso).getTime() - today.getTime()) / 86400000);
+  const diff = Math.ceil((new Date(iso).getTime() - getNow().getTime()) / 86400000);
   if (diff <= 0) return '오늘';
   if (diff === 1) return '내일';
   return `${diff}일 후`;
@@ -80,7 +82,7 @@ export default function HomeScreen() {
 
   const nextCareDays = useMemo(() => {
     if (!nextCare) return null;
-    return Math.ceil((new Date(nextCare.next_due_at).getTime() - today.getTime()) / 86400000);
+    return Math.ceil((new Date(nextCare.next_due_at).getTime() - getNow().getTime()) / 86400000);
   }, [nextCare]);
 
   async function toggle(s: CareSchedule) {
@@ -104,7 +106,7 @@ export default function HomeScreen() {
               resizeMode="contain"
             />
           </View>
-          <TouchableOpacity style={styles.headerBtn}>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/settings')}>
             <Text style={styles.headerBtnText}>🔔</Text>
           </TouchableOpacity>
         </View>
