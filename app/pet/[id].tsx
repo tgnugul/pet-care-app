@@ -6,7 +6,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { usePetStore, SPECIES_EMOJI, formatAge, formatDPlus, Pet } from '@/stores/pet.store';
-import { useCareStore, CARE_TYPE_META, CARE_TYPE_IMAGES, isDoneToday } from '@/stores/schedule.store';
+import { useCareStore, CARE_TYPE_META, CARE_TYPE_IMAGES, isDoneToday, localDateStr } from '@/stores/schedule.store';
 import { useWalkStore } from '@/stores/walk.store';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -33,11 +33,14 @@ export default function PetDetailScreen() {
     }
   }, [pet?.id]);
 
-  const todayDone = schedules.filter(isDoneToday).length;
-  const todayTotal = schedules.filter(s => {
-    if (s.frequency === 'daily') return true;
-    return s.next_due_at.slice(0, 10) === new Date().toISOString().slice(0, 10);
-  }).length;
+  const todayStr = localDateStr();
+  const todayItems = schedules.filter(s =>
+    s.frequency === 'daily' ||
+    localDateStr(new Date(s.next_due_at)) <= todayStr ||
+    (s.last_done_at !== null && localDateStr(new Date(s.last_done_at)) === todayStr),
+  );
+  const todayDone = todayItems.filter(isDoneToday).length;
+  const todayTotal = todayItems.length;
 
   const thisMonthWalks = useMemo(() => {
     const now = new Date();
