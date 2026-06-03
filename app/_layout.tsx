@@ -1,8 +1,10 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
 import * as Linking from 'expo-linking';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -11,18 +13,20 @@ import { requestNotificationPermission, registerPushToken, setupNotificationCate
 import { useCareStore, calcNextDue } from '@/stores/schedule.store';
 import type { CareSchedule, Frequency } from '@/stores/schedule.store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { initRevenueCat, identifyRevenueCatUser, resetRevenueCatUser } from '@/lib/revenuecat';
-import { useSubscriptionStore } from '@/stores/subscription.store';
+import { resetRevenueCatUser } from '@/lib/revenuecat';
 import { usePetStore } from '@/stores/pet.store';
 import { useWalkStore } from '@/stores/walk.store';
-import { useCareStore } from '@/stores/schedule.store';
+import { useSettingsStore } from '@/stores/settings.store';
+import { registerWidgetTaskHandlers } from '@/widgets/task-handler';
+
+registerWidgetTaskHandlers();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const { fetchStatus } = useSubscriptionStore();
+  const { loadSettings } = useSettingsStore();
 
   useEffect(() => {
-    initRevenueCat();
+    loadSettings();
 
     requestNotificationPermission().then(granted => {
       if (granted) registerPushToken();
@@ -31,7 +35,7 @@ export default function RootLayout() {
 
     // OAuth 딥링크 처리
     const handleDeepLink = async (url: string | null) => {
-      if (!url || !url.startsWith('pawmate://')) return;
+      if (!url || (!url.startsWith('pawmate://') && !url.startsWith('exp+pawmate://'))) return;
 
       const hasCode = url.includes('code=');
       const hasToken = url.includes('access_token=');
@@ -64,10 +68,6 @@ export default function RootLayout() {
       }
       if (event === 'SIGNED_IN') {
         registerPushToken();
-        if (session?.user.id) {
-          await identifyRevenueCatUser(session.user.id);
-          fetchStatus();
-        }
       }
     });
 
@@ -107,6 +107,8 @@ export default function RootLayout() {
   }, []);
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+    <SafeAreaProvider>
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -125,5 +127,7 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>
+    </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
 import { Colors, Radius, Shadow } from '@/constants/design';
@@ -32,11 +33,15 @@ export default function LoginScreen() {
 
   async function handleSocialLogin(provider: 'google' | 'kakao') {
     setSocialLoading(provider);
-    const redirectTo = 'pawmate://';
+    const redirectTo = Linking.createURL('');
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo, skipBrowserRedirect: true },
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+        ...(provider === 'google' && { queryParams: { prompt: 'select_account' } }),
+      },
     });
 
     if (error || !data.url) {
@@ -45,8 +50,32 @@ export default function LoginScreen() {
       return;
     }
 
-    await WebBrowser.openBrowserAsync(data.url);
+    if (provider === 'kakao') {
+      setSocialLoading(null);
+      await WebBrowser.openBrowserAsync(data.url);
+      return;
+    }
+
+    // Google: WebBrowser 인앱 처리
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo, { preferEphemeralSession: true });
     setSocialLoading(null);
+
+    if (result.type === 'success' && result.url) {
+      const url = result.url;
+      if (url.includes('code=')) {
+        const { error } = await supabase.auth.exchangeCodeForSession(url);
+        if (!error) router.replace('/');
+      } else if (url.includes('access_token=')) {
+        const fragment = url.includes('#') ? url.split('#')[1] : url.split('?')[1] ?? '';
+        const params = new URLSearchParams(fragment);
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token') ?? '';
+        if (access_token) {
+          await supabase.auth.setSession({ access_token, refresh_token });
+          router.replace('/');
+        }
+      }
+    }
   }
 
   async function handleLogin() {
@@ -74,7 +103,12 @@ export default function LoginScreen() {
           <Text style={styles.tagline}>반려동물과 함께하는 모든 순간</Text>
         </View>
 
-        <View style={styles.form}>
+        <ScrollView
+          style={styles.formScroll}
+          contentContainerStyle={styles.form}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <Text style={styles.formTitle}>로그인</Text>
 
           <TextInput
@@ -164,7 +198,7 @@ export default function LoginScreen() {
             }
           </TouchableOpacity>
 
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -182,12 +216,16 @@ const styles = StyleSheet.create({
   logo: { fontSize: 28, fontWeight: '800', color: Colors.white },
   tagline: { fontSize: 14, color: 'rgba(255,255,255,0.85)' },
 
-  form: {
+  formScroll: {
     flex: 1,
     backgroundColor: Colors.white,
     borderTopLeftRadius: 28, borderTopRightRadius: 28,
     marginTop: -20,
-    padding: 28, gap: 14,
+  },
+  form: {
+    padding: 28,
+    gap: 14,
+    paddingBottom: 48,
   },
   formTitle: { fontSize: 20, fontWeight: '800', color: Colors.text, marginBottom: 6 },
 

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { supabase } from '@/lib/supabase';
 import { Colors, Radius, Shadow } from '@/constants/design';
 
@@ -39,16 +40,29 @@ export default function SignupScreen() {
 
   async function handleSocialLogin(provider: 'google' | 'kakao') {
     setSocialLoading(provider);
+    const redirectTo = Linking.createURL('');
+
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: 'pawmate://', skipBrowserRedirect: true },
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+        ...(provider === 'google' && { queryParams: { prompt: 'select_account' } }),
+      },
     });
     if (error || !data.url) {
       setSocialLoading(null);
       Alert.alert('오류', '가입을 시작할 수 없어요. 잠시 후 다시 시도해주세요.');
       return;
     }
-    await WebBrowser.openBrowserAsync(data.url);
+
+    if (provider === 'kakao') {
+      setSocialLoading(null);
+      await WebBrowser.openBrowserAsync(data.url);
+      return;
+    }
+
+    await WebBrowser.openAuthSessionAsync(data.url, redirectTo, { preferEphemeralSession: true });
     setSocialLoading(null);
   }
 

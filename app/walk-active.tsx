@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, Alert, Platform,
+  View, Text, TouchableOpacity, StyleSheet, Alert, Platform,
 } from 'react-native';
-import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
 import { calcDistance, formatDuration } from '@/lib/gps';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { supabase } from '@/lib/supabase';
 import { useWalkStore } from '@/stores/walk.store';
+import { WALK_LOCATION_TASK, WALK_ROUTE_KEY } from '@/lib/walk-task';
+import { setWalkState, clearWalkState } from '@/lib/widget-storage';
 
 type Coord = { latitude: number; longitude: number };
 
@@ -213,6 +217,7 @@ function MapSection({ region, route, mapRef, webViewRef }: {
 
 export default function WalkActiveScreen() {
   const { fetchLogs } = useWalkStore();
+  const { autostart } = useLocalSearchParams<{ autostart?: string }>();
   const [isTracking, setIsTracking] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [distance, setDistance] = useState(0);
@@ -224,21 +229,30 @@ export default function WalkActiveScreen() {
   const [permGranted, setPermGranted] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const locationSub = useRef<Location.LocationSubscription | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastCoord = useRef<Coord | null>(null);
   const startedAt = useRef<string | null>(null);
+  const startTimestamp = useRef<number | null>(null);
   const mapRef = useRef<any>(null);
   const webViewRef = useRef<any>(null);
 
   function stopAll() {
     timerRef.current && clearInterval(timerRef.current);
-    locationSub.current?.remove();
+    pollRef.current && clearInterval(pollRef.current);
+    Location.stopLocationUpdatesAsync(WALK_LOCATION_TASK).catch(() => {});
   }
 
   useEffect(() => {
     initMap();
     return () => stopAll();
   }, []);
+
+  // 위젯에서 autostart=true로 진입하면 권한 확인 후 자동 시작
+  useEffect(() => {
+    if (autostart === 'true' && permGranted && !isTracking) {
+      handleStart();
+    }
+  }, [permGranted]);
 
   async function initMap() {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -248,47 +262,124 @@ export default function WalkActiveScreen() {
       ]);
       return;
     }
-    setPermGranted(true);
+    await Location.requestBackgroundPermissionsAsync();
+
+    // 위젯에서 시작한 산책이 진행 중인지 확인 (앱 재진입 시 복원)
+    try {
+      const walkStateRaw = await AsyncStorage.getItem('@pawmate/walk_state');
+      if (walkStateRaw) {
+        const ws = JSON.parse(walkStateRaw);
+        if (ws?.isWalking && ws.startedAt) {
+          setIsTracking(true);
+          startedAt.current = ws.startedAt;
+          startTimestamp.current = new Date(ws.startedAt).getTime();
+          setElapsed(Math.floor((Date.now() - startTimestamp.current) / 1000));
+
+          const storedRoute = await AsyncStorage.getItem(WALK_ROUTE_KEY);
+          const existingRoute: Coord[] = storedRoute ? JSON.parse(storedRoute) : [];
+          setRoute(existingRoute);
+
+          if (existingRoute.length > 0) {
+            const last = existingRoute[existingRoute.length - 1];
+            setRegion({ ...last, latitudeDelta: 0.003, longitudeDelta: 0.003 });
+            lastCoord.current = last;
+          }
+
+          timerRef.current = setInterval(() => {
+            if (startTimestamp.current !== null)
+              setElapsed(Math.floor((Date.now() - startTimestamp.current) / 1000));
+          }, 1000);
+
+          pollRef.current = setInterval(async () => {
+            const stored = await AsyncStorage.getItem(WALK_ROUTE_KEY);
+            if (!stored) return;
+            const newRoute: Coord[] = JSON.parse(stored);
+            setRoute(newRoute);
+            if (newRoute.length > 0) {
+              const last = newRoute[newRoute.length - 1];
+              setRegion(r => r ? { ...r, latitude: last.latitude, longitude: last.longitude } : null);
+              mapRef.current?.animateCamera({ center: last }, { duration: 500 });
+              let total = 0;
+              for (let i = 1; i < newRoute.length; i++) {
+                total += calcDistance(newRoute[i - 1].latitude, newRoute[i - 1].longitude, newRoute[i].latitude, newRoute[i].longitude);
+              }
+              setDistance(total);
+            }
+          }, 2000);
+
+          setPermGranted(true);
+          return; // 기존 산책 복원 완료 — autostart 무시
+        }
+      }
+    } catch {}
+
     const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
     const initCoord: Coord = { latitude: current.coords.latitude, longitude: current.coords.longitude };
     setRegion({ ...initCoord, latitudeDelta: 0.003, longitudeDelta: 0.003 });
     lastCoord.current = initCoord;
+    setPermGranted(true);
   }
 
   async function handleStart() {
     if (!permGranted) return;
     setIsTracking(true);
-    startedAt.current = new Date().toISOString();
-    if (lastCoord.current) setRoute([lastCoord.current]);
+    const now = new Date();
+    startedAt.current = now.toISOString();
+    startTimestamp.current = now.getTime();
+    const initialRoute = lastCoord.current ? [lastCoord.current] : [];
+    await AsyncStorage.setItem(WALK_ROUTE_KEY, JSON.stringify(initialRoute));
+    setRoute(initialRoute);
+    await setWalkState({ isWalking: true, startedAt: now.toISOString(), distanceKm: 0, durationSec: 0 });
 
-    timerRef.current = setInterval(() => setElapsed(s => s + 1), 1000);
+    timerRef.current = setInterval(() => {
+      if (startTimestamp.current !== null) {
+        setElapsed(Math.floor((Date.now() - startTimestamp.current) / 1000));
+      }
+    }, 1000);
 
-    locationSub.current = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.BestForNavigation, distanceInterval: 5 },
-      ({ coords }) => {
-        if (coords.accuracy !== null && coords.accuracy > 25) return;
-        const next: Coord = { latitude: coords.latitude, longitude: coords.longitude };
-        if (lastCoord.current) {
-          const delta = calcDistance(
-            lastCoord.current.latitude, lastCoord.current.longitude,
-            next.latitude, next.longitude,
-          );
-          setDistance(d => d + delta);
-        }
-        lastCoord.current = next;
-        setRoute(prev => [...prev, next]);
-        setRegion(r => r ? { ...r, latitude: next.latitude, longitude: next.longitude } : null);
-        mapRef.current?.animateCamera(
-          { center: { latitude: next.latitude, longitude: next.longitude } },
-          { duration: 500 },
-        );
+    await Location.startLocationUpdatesAsync(WALK_LOCATION_TASK, {
+      accuracy: Location.Accuracy.BestForNavigation,
+      distanceInterval: 5,
+      foregroundService: {
+        notificationTitle: '뽀시래기 산책 중',
+        notificationBody: '산책 경로를 기록하고 있어요.',
+        notificationColor: '#F5A623',
       },
-    );
+      pausesUpdatesAutomatically: false,
+    });
+
+    pollRef.current = setInterval(async () => {
+      const stored = await AsyncStorage.getItem(WALK_ROUTE_KEY);
+      if (!stored) return;
+      const newRoute: Coord[] = JSON.parse(stored);
+      setRoute(newRoute);
+      if (newRoute.length > 0) {
+        const last = newRoute[newRoute.length - 1];
+        setRegion(r => r ? { ...r, latitude: last.latitude, longitude: last.longitude } : null);
+        mapRef.current?.animateCamera({ center: last }, { duration: 500 });
+        let total = 0;
+        for (let i = 1; i < newRoute.length; i++) {
+          total += calcDistance(newRoute[i - 1].latitude, newRoute[i - 1].longitude, newRoute[i].latitude, newRoute[i].longitude);
+        }
+        setDistance(total);
+      }
+    }, 2000);
   }
 
   async function handleStop() {
     stopAll();
+    await clearWalkState();
     const endedAt = new Date().toISOString();
+
+    const stored = await AsyncStorage.getItem(WALK_ROUTE_KEY);
+    const finalRoute: Coord[] = stored ? JSON.parse(stored) : route;
+    await AsyncStorage.removeItem(WALK_ROUTE_KEY);
+
+    let totalDistance = 0;
+    for (let i = 1; i < finalRoute.length; i++) {
+      totalDistance += calcDistance(finalRoute[i - 1].latitude, finalRoute[i - 1].longitude, finalRoute[i].latitude, finalRoute[i].longitude);
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     if (session && elapsed > 0) {
       await supabase.from('walk_logs').insert({
@@ -296,14 +387,14 @@ export default function WalkActiveScreen() {
         started_at: startedAt.current ?? endedAt,
         ended_at: endedAt,
         duration_minutes: Math.round((elapsed / 60) * 10) / 10,
-        distance_km: Math.round(distance * 1000) / 1000,
-        route_coordinates: route,
+        distance_km: Math.round(totalDistance * 1000) / 1000,
+        route_coordinates: finalRoute,
       });
       await fetchLogs();
     }
     Alert.alert(
       '산책 완료! 🐾',
-      `시간: ${formatDuration(elapsed)}\n거리: ${distance.toFixed(2)}km`,
+      `시간: ${formatDuration(elapsed)}\n거리: ${totalDistance.toFixed(2)}km`,
       [{ text: '확인', onPress: () => router.back() }],
     );
   }
@@ -312,10 +403,17 @@ export default function WalkActiveScreen() {
     if (isTracking && elapsed > 0) {
       Alert.alert('산책을 종료할까요?', '지금까지의 기록은 저장되지 않아요.', [
         { text: '계속 산책', style: 'cancel' },
-        { text: '종료', style: 'destructive', onPress: () => { stopAll(); router.back(); } },
+        {
+          text: '종료', style: 'destructive', onPress: async () => {
+            stopAll();
+            await clearWalkState();
+            router.back();
+          },
+        },
       ]);
     } else {
       stopAll();
+      clearWalkState();
       router.back();
     }
   }

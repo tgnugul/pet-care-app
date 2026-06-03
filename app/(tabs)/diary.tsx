@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView,
+  View, Text, TouchableOpacity, StyleSheet,
   ScrollView, ActivityIndicator, Alert, Modal, StatusBar,
-  TextInput, KeyboardAvoidingView, Platform,
+  TextInput, KeyboardAvoidingView, Platform, Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
+import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, runOnJS } from 'react-native-reanimated';
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { usePetStore } from '@/stores/pet.store';
 import {
   usePhotoStore, filterByMonth, groupByDate,
-  pickAndResize, FREE_LIMIT_BYTES, type Photo, type PickedPhoto,
+  pickMultipleAndResize, type Photo, type PickedPhoto,
 } from '@/stores/photo.store';
 
 const DAYS_LABEL = ['일', '월', '화', '수', '목', '금', '토'];
@@ -23,18 +28,122 @@ export default function DiaryScreen() {
   const [month, setMonth] = useState(now.getMonth() + 1);
 
   const { pets, fetchPets } = usePetStore();
-  const { photos, loading, uploading, fetchPhotos, fetchGlobalTotal, savePhoto, deletePhoto, globalTotalBytes } = usePhotoStore();
+  const { photos, loading, uploading, uploadProgress, fetchPhotos, savePhoto, savePhotos, deletePhoto } = usePhotoStore();
 
   const [viewing, setViewing] = useState<Photo | null>(null);
   const [pickedPhoto, setPickedPhoto] = useState<PickedPhoto | null>(null);
+
+  const SCREEN_WIDTH = Dimensions.get('window').width;
+
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const savedTx = useSharedValue(0);
+  const savedTy = useSharedValue(0);
+  const slideX = useSharedValue(0);
+
+  const viewerAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: tx.value + slideX.value },
+      { translateY: ty.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  function resetViewer() {
+    'worklet';
+    scale.value = withSpring(1);
+    savedScale.value = 1;
+    tx.value = withSpring(0);
+    ty.value = withSpring(0);
+    savedTx.value = 0;
+    savedTy.value = 0;
+    slideX.value = 0;
+  }
+
+  function navigateTo(photo: Photo) {
+    setViewing(photo);
+    slideX.value = 0;
+  }
+
+  function handleSwipeEnd(translationX: number) {
+    const idx = monthPhotos.findIndex(p => p.id === viewing?.id);
+    const THRESHOLD = 60;
+    if (translationX < -THRESHOLD && idx < monthPhotos.length - 1) {
+      slideX.value = withTiming(-SCREEN_WIDTH, { duration: 180 }, () => {
+        runOnJS(navigateTo)(monthPhotos[idx + 1]);
+      });
+    } else if (translationX > THRESHOLD && idx > 0) {
+      slideX.value = withTiming(SCREEN_WIDTH, { duration: 180 }, () => {
+        runOnJS(navigateTo)(monthPhotos[idx - 1]);
+      });
+    } else {
+      slideX.value = withSpring(0);
+    }
+  }
+
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate(e => { scale.value = Math.max(1, Math.min(5, savedScale.value * e.scale)); })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+      if (scale.value <= 1) resetViewer();
+    });
+
+  const panGesture = Gesture.Pan()
+    .onUpdate(e => {
+      if (scale.value > 1) {
+        tx.value = savedTx.value + e.translationX;
+        ty.value = savedTy.value + e.translationY;
+      } else {
+        slideX.value = e.translationX;
+      }
+    })
+    .onEnd(e => {
+      if (scale.value > 1) {
+        savedTx.value = tx.value;
+        savedTy.value = ty.value;
+      } else {
+        runOnJS(handleSwipeEnd)(e.translationX);
+      }
+    });
+
+  const doubleTapGesture = Gesture.Tap().numberOfTaps(2).onStart(() => {
+    if (scale.value > 1) {
+      resetViewer();
+    } else {
+      scale.value = withSpring(2.5);
+      savedScale.value = 2.5;
+    }
+  });
+
+  const viewerGesture = Gesture.Simultaneous(pinchGesture, panGesture, doubleTapGesture);
+
+  async function downloadPhoto(url: string) {
+    const { status } = await MediaLibrary.requestPermissionsAsync(true);
+    if (status !== 'granted') {
+      Alert.alert('권한 필요', '사진을 저장하려면 갤러리 접근 권한이 필요해요.');
+      return;
+    }
+    try {
+      const fileUri = FileSystem.documentDirectory + `pawmate_${Date.now()}.jpg`;
+      const { uri } = await FileSystem.downloadAsync(url, fileUri);
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert('저장 완료', '사진이 갤러리에 저장됐어요.');
+    } catch (e) {
+      console.error('download error', e);
+      Alert.alert('오류', '사진 저장에 실패했어요.');
+    }
+  }
   const [photoName, setPhotoName] = useState('');
   const [galleryVisible, setGalleryVisible] = useState(false);
+  const [monthPickerVisible, setMonthPickerVisible] = useState(false);
+  const [pickerYear, setPickerYear] = useState(now.getFullYear());
 
   const pet = pets[0] ?? null;
 
   useEffect(() => {
     if (pets.length === 0) fetchPets();
-    fetchGlobalTotal();
   }, []);
 
   useEffect(() => {
@@ -46,9 +155,6 @@ export default function DiaryScreen() {
   const photoDates = new Set(monthPhotos.map(p => p.taken_at));
   const recentPhotos = monthPhotos.slice(0, 5);
 
-  const totalMB = (globalTotalBytes / (1024 * 1024)).toFixed(1);
-  const usedFraction = Math.min(globalTotalBytes / FREE_LIMIT_BYTES, 1);
-  const isNearLimit = usedFraction >= 0.8;
 
   function prevMonth() {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
@@ -61,10 +167,14 @@ export default function DiaryScreen() {
 
   async function handleAdd() {
     if (!pet) { Alert.alert('반려동물을 먼저 등록해주세요.'); return; }
-    const picked = await pickAndResize();
-    if (!picked) return;
-    setPickedPhoto(picked);
-    setPhotoName('');
+    const picks = await pickMultipleAndResize();
+    if (picks.length === 0) return;
+    if (picks.length === 1) {
+      setPickedPhoto(picks[0]);
+      setPhotoName('');
+    } else {
+      await savePhotos(pet.id, picks);
+    }
   }
 
   async function handleSave(name: string | null) {
@@ -95,7 +205,7 @@ export default function DiaryScreen() {
   const startDay = startDayOfMonth(year, month);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>사진 다이어리</Text>
         <TouchableOpacity
@@ -103,18 +213,32 @@ export default function DiaryScreen() {
           onPress={handleAdd}
           disabled={uploading || !!pickedPhoto}
         >
-          {uploading
-            ? <ActivityIndicator color={Colors.primary} size="small" />
-            : <Text style={styles.addBtnText}>+ 추가</Text>
+          {uploadProgress
+            ? <Text style={styles.addBtnText}>{uploadProgress.done}/{uploadProgress.total} 업로드 중</Text>
+            : uploading
+              ? <ActivityIndicator color={Colors.primary} size="small" />
+              : <Text style={styles.addBtnText}>+ 추가</Text>
           }
         </TouchableOpacity>
       </View>
 
+      {!pet ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }}>
+          <Text style={{ fontSize: 40, marginBottom: 12 }}>🐾</Text>
+          <Text style={{ fontSize: 15, color: Colors.sub, fontWeight: '600' }}>반려동물을 먼저 등록해주세요</Text>
+        </View>
+      ) : (<>
       {/* 월 선택 */}
       <View style={styles.monthRow}>
-        <TouchableOpacity onPress={prevMonth}><Text style={styles.arrow}>‹</Text></TouchableOpacity>
-        <Text style={styles.monthLabel}>{year}년 {month}월</Text>
-        <TouchableOpacity onPress={nextMonth}><Text style={styles.arrow}>›</Text></TouchableOpacity>
+        <TouchableOpacity onPress={prevMonth} hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}>
+          <Text style={styles.arrow}>‹</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => { setPickerYear(year); setMonthPickerVisible(true); }}>
+          <Text style={styles.monthLabel}>{year}년 {month}월 ▾</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={nextMonth} hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}>
+          <Text style={styles.arrow}>›</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -203,30 +327,53 @@ export default function DiaryScreen() {
           </ScrollView>
         )}
 
-        {/* 저장 용량 */}
-        <View style={styles.storageCard}>
-          <View style={styles.storageHeader}>
-            <Text style={styles.storageLabel}>패밀리 저장 용량</Text>
-            <Text style={[styles.storageValue, isNearLimit && { color: Colors.danger }]}>
-              {`${totalMB}MB / 100MB`}
-            </Text>
-          </View>
-          <View style={styles.storageBar}>
-            <View style={[
-              styles.storageBarFill,
-              { width: `${usedFraction * 100}%` },
-              isNearLimit && { backgroundColor: Colors.danger },
-            ]} />
-          </View>
-          <Text style={styles.storageSub}>
-            {isNearLimit
-              ? '저장 공간이 부족해요. 오래된 사진을 삭제해보세요.'
-              : '패밀리 공유 저장공간 100MB. 패밀리 전원의 업로드가 합산돼요.'}
-          </Text>
-        </View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* 월 선택 피커 */}
+      <Modal
+        visible={monthPickerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMonthPickerVisible(false)}
+      >
+        <TouchableOpacity style={styles.pickerBackdrop} activeOpacity={1} onPress={() => setMonthPickerVisible(false)}>
+          <TouchableOpacity activeOpacity={1} style={styles.pickerCard}>
+            {/* 연도 네비게이션 */}
+            <View style={styles.pickerYearRow}>
+              <TouchableOpacity onPress={() => setPickerYear(y => y - 1)} style={styles.pickerArrowBtn}>
+                <Text style={styles.pickerArrow}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.pickerYearText}>{pickerYear}년</Text>
+              <TouchableOpacity onPress={() => setPickerYear(y => y + 1)} style={styles.pickerArrowBtn}>
+                <Text style={styles.pickerArrow}>›</Text>
+              </TouchableOpacity>
+            </View>
+            {/* 월 그리드 */}
+            <View style={styles.pickerMonthGrid}>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(m => {
+                const isSelected = m === month && pickerYear === year;
+                return (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.pickerMonthBtn, isSelected && styles.pickerMonthBtnActive]}
+                    onPress={() => {
+                      setYear(pickerYear);
+                      setMonth(m);
+                      setMonthPickerVisible(false);
+                    }}
+                  >
+                    <Text style={[styles.pickerMonthText, isSelected && styles.pickerMonthTextActive]}>
+                      {m}월
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* 전체 갤러리 모달 */}
       <Modal visible={galleryVisible} animationType="slide" onRequestClose={() => setGalleryVisible(false)}>
@@ -264,10 +411,10 @@ export default function DiaryScreen() {
       {/* 사진 이름 입력 모달 */}
       <Modal visible={!!pickedPhoto} transparent animationType="slide" onRequestClose={() => setPickedPhoto(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.nameOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => handleSave(null)} />
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setPickedPhoto(null)} />
           <View style={styles.nameCard}>
             <Text style={styles.nameTitle}>사진 이름</Text>
-            <Text style={styles.nameSub}>이름을 입력하거나 건너뛸 수 있어요</Text>
+            <Text style={styles.nameSub}>이름을 입력하거나 비워두고 저장할 수 있어요</Text>
             <TextInput
               style={styles.nameInput}
               placeholder="예: 첫 목욕 🛁"
@@ -280,8 +427,8 @@ export default function DiaryScreen() {
               onSubmitEditing={() => handleSave(photoName.trim() || null)}
             />
             <View style={styles.nameBtns}>
-              <TouchableOpacity style={styles.skipBtn} onPress={() => handleSave(null)}>
-                <Text style={styles.skipBtnText}>건너뛰기</Text>
+              <TouchableOpacity style={styles.skipBtn} onPress={() => setPickedPhoto(null)}>
+                <Text style={styles.skipBtnText}>취소</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={() => handleSave(photoName.trim() || null)}>
                 <Text style={styles.saveBtnText}>저장</Text>
@@ -292,17 +439,26 @@ export default function DiaryScreen() {
       </Modal>
 
       {/* 전체화면 사진 뷰어 */}
-      <Modal visible={!!viewing} transparent animationType="fade" onRequestClose={() => setViewing(null)}>
+      <Modal
+        visible={!!viewing}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewing(null)}
+        onShow={() => { scale.value = 1; savedScale.value = 1; tx.value = 0; ty.value = 0; savedTx.value = 0; savedTy.value = 0; slideX.value = 0; }}
+      >
+        <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar hidden />
-        <View style={styles.viewer}>
-          <Image
-            source={{ uri: viewing?.photo_url }}
-            style={StyleSheet.absoluteFill}
-            contentFit="contain"
-          />
-          <SafeAreaView style={styles.viewerOverlay} pointerEvents="box-none">
-            {/* 상단 바 */}
-            <View style={styles.viewerTop}>
+        <GestureDetector gesture={viewerGesture}>
+          <View style={styles.viewer}>
+            <Animated.View style={[StyleSheet.absoluteFill, viewerAnimatedStyle]}>
+              <Image
+                source={{ uri: viewing?.photo_url }}
+                style={StyleSheet.absoluteFill}
+                contentFit="contain"
+              />
+            </Animated.View>
+            <SafeAreaView style={[StyleSheet.absoluteFill, styles.viewerOverlay]} pointerEvents="box-none">
+              <View style={styles.viewerTop}>
               <TouchableOpacity style={styles.viewerBtn} onPress={() => setViewing(null)}>
                 <Text style={styles.viewerBtnTxt}>✕</Text>
               </TouchableOpacity>
@@ -313,16 +469,34 @@ export default function DiaryScreen() {
                     : viewing.taken_at.replace(/-/g, '.')}
                 </Text>
               )}
-              <TouchableOpacity
-                style={[styles.viewerBtn, styles.viewerDeleteBtn]}
-                onPress={() => viewing && handleDeletePhoto(viewing)}
-              >
-                <Text style={styles.viewerBtnTxt}>🗑</Text>
-              </TouchableOpacity>
-            </View>
-          </SafeAreaView>
-        </View>
+              <View style={styles.viewerActions}>
+                <TouchableOpacity
+                  style={styles.viewerBtn}
+                  onPress={() => viewing && downloadPhoto(viewing.photo_url)}
+                >
+                  <Text style={styles.viewerBtnTxt}>⬇</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.viewerBtn, styles.viewerDeleteBtn]}
+                  onPress={() => viewing && handleDeletePhoto(viewing)}
+                >
+                  <Text style={styles.viewerBtnTxt}>🗑</Text>
+                </TouchableOpacity>
+              </View>
+              {monthPhotos.length > 1 && viewing && (
+                <View style={styles.pageIndicator} pointerEvents="none">
+                  <Text style={styles.pageIndicatorTxt}>
+                    {monthPhotos.findIndex(p => p.id === viewing.id) + 1} / {monthPhotos.length}
+                  </Text>
+                </View>
+              )}
+              </View>
+            </SafeAreaView>
+          </View>
+        </GestureDetector>
+        </GestureHandlerRootView>
       </Modal>
+      </>)}
     </SafeAreaView>
   );
 }
@@ -471,7 +645,7 @@ const styles = StyleSheet.create({
 
   // 전체화면 뷰어
   viewer: { flex: 1, backgroundColor: '#000' },
-  viewerOverlay: { flex: 1 },
+  viewerOverlay: { justifyContent: 'space-between' },
   viewerTop: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 12,
@@ -484,4 +658,39 @@ const styles = StyleSheet.create({
   viewerDeleteBtn: { backgroundColor: 'rgba(255,80,80,0.25)' },
   viewerBtnTxt: { fontSize: 15, color: '#fff', fontWeight: '700' },
   viewerDate: { flex: 1, textAlign: 'center', fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '600', marginHorizontal: 8 },
+  viewerActions: { flexDirection: 'row', gap: 8 },
+  // 월 피커
+  pickerBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  pickerCard: {
+    backgroundColor: Colors.white, borderRadius: 20,
+    padding: 20, width: 300, ...Shadow.card,
+  },
+  pickerYearRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  pickerArrowBtn: { padding: 8 },
+  pickerArrow: { fontSize: 22, color: Colors.sub },
+  pickerYearText: { fontSize: 17, fontWeight: '800', color: Colors.text },
+  pickerMonthGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 8,
+  },
+  pickerMonthBtn: {
+    width: '22%', paddingVertical: 10, borderRadius: 10,
+    alignItems: 'center', backgroundColor: Colors.bg,
+  },
+  pickerMonthBtnActive: { backgroundColor: Colors.primary },
+  pickerMonthText: { fontSize: 14, fontWeight: '600', color: Colors.sub },
+  pickerMonthTextActive: { color: Colors.white, fontWeight: '800' },
+
+  pageIndicator: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 12, paddingVertical: 5,
+    borderRadius: 20, marginTop: 10,
+  },
+  pageIndicatorTxt: { fontSize: 13, color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
 });

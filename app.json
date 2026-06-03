@@ -9,17 +9,20 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "반려동물 프로필 사진 촬영에 사용됩니다.",
+        "NSPhotoLibraryUsageDescription": "반려동물 프로필 사진 선택에 사용됩니다."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#FAF5EE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.tgnugul.pawmate"
     },
     "web": {
       "output": "static",
@@ -35,7 +38,7 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#ffffff"
           }
         }
       ],
@@ -48,7 +51,56 @@
           "defaultChannel": "care-reminders"
         }
       ],
-      "@react-native-community/datetimepicker"
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "반려동물 사진을 갤러리에서 선택하는 데 사용됩니다.",
+          "savePhotosPermission": "반려동물 사진을 갤러리에 저장하는 데 사용됩니다.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "CareWidget",
+              "label": "뽀시래기 케어",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "description": "오늘의 반려동물 케어 일정",
+              "previewImage": "./assets/images/widget-preview.png",
+              "updatePeriodMillis": 1800000,
+              "resizeMode": "both"
+            },
+            {
+              "name": "WalkWidget",
+              "label": "뽀시래기 산책",
+              "minWidth": "110dp",
+              "minHeight": "73dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "description": "산책 시작 및 현황",
+              "previewImage": "./assets/images/widget-preview.png",
+              "updatePeriodMillis": 1800000,
+              "resizeMode": "both"
+            }
+          ]
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "산책 경로 기록을 위해 위치 정보가 사용됩니다.",
+          "locationAlwaysAndWhenInUsePermission": "산책 중 화면을 끄거나 다른 앱을 사용해도 경로를 계속 기록하기 위해 위치 정보가 사용됩니다.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
