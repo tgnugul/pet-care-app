@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { getBreedRecommendations } from '@/lib/recommendation';
@@ -151,8 +152,6 @@ const styles = StyleSheet.create({
   warningItem: { fontSize: 14, color: '#E65100', lineHeight: 22 },
 
   adoptBadge: { marginTop: 10, backgroundColor: '#FFF8E1', borderRadius: 10, padding: 10, alignItems: 'center' },
-  adoptText: { fontSize: 13, color: '#F57F17', fontWeight: '600' },
-
   adoptButton: {
     backgroundColor: '#FFF8E1', borderRadius: 14, padding: 18,
     alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 10,

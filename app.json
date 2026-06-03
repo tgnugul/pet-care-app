@@ -2,7 +2,7 @@
   "expo": {
     "name": "뽀시래기",
     "slug": "pawmate",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pawmate",
