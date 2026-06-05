@@ -1,11 +1,12 @@
-import { useEffect, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Image } from 'react-native';
+import { useEffect, useMemo, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Image, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { usePetStore, SPECIES_EMOJI, formatDPlus } from '@/stores/pet.store';
 import { useCareStore, CARE_TYPE_META, CARE_TYPE_IMAGES, isDoneToday, localDateStr, CareSchedule, Frequency } from '@/stores/schedule.store';
-
-const DAY_KO = ['일', '월', '화', '수', '목', '금', '토'];
+import { useWalkStore } from '@/stores/walk.store';
 
 function getNow() {
   return new Date();
@@ -50,17 +51,53 @@ function CheckCircle({ done }: { done: boolean }) {
 
 export default function HomeScreen() {
   const { pets, loading: petLoading, fetchPets } = usePetStore();
-  const { schedules, fetchSchedules, markDone, markUndone } = useCareStore();
+  const { schedules, fetchSchedules, markDone, markUndone, careStreak } = useCareStore();
+  const { logs, fetchLogs } = useWalkStore();
 
   const pet = pets[0] ?? null;
 
   useEffect(() => { fetchPets(); }, []);
   useEffect(() => { if (pet) fetchSchedules(pet.id); }, [pet?.id]);
+  useEffect(() => { fetchLogs(); }, []);
 
   const todayItems = schedules.filter(isTodaySchedule);
   const upcomingItems = schedules.filter(isUpcoming).slice(0, 3);
   const doneCount = todayItems.filter(isDoneToday).length;
+
+  // 완료 배너
+  const bannerAnim = useRef(new Animated.Value(0)).current;
+  const prevAllDone = useRef(true);
+  const todayStr = localDateStr();
+  const allTodayDoneItems = schedules.filter(s =>
+    s.frequency === 'daily' ||
+    localDateStr(new Date(s.next_due_at)) <= todayStr ||
+    (s.last_done_at !== null && localDateStr(new Date(s.last_done_at)) === todayStr),
+  );
+  const allTodayDone = allTodayDoneItems.length > 0 && allTodayDoneItems.every(isDoneToday);
+
+  useEffect(() => {
+    if (!prevAllDone.current && allTodayDone) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      bannerAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(bannerAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(2500),
+        Animated.timing(bannerAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+    prevAllDone.current = allTodayDone;
+  }, [allTodayDone]);
   const dPlus = formatDPlus(pet?.birthday ?? null);
+
+  const weekWalkKm = useMemo(() => {
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    const weekLogs = logs.filter(l => new Date(l.started_at) >= weekStart);
+    return weekLogs.length > 0
+      ? weekLogs.reduce((sum, l) => sum + l.distance_km, 0)
+      : null;
+  }, [logs]);
 
   // 생일 D-7 배너용
   const birthdayDaysLeft = useMemo(() => {
@@ -91,24 +128,16 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* 헤더 */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.headerBtn}>
-            <Text style={styles.headerBtnText}>≡</Text>
-          </TouchableOpacity>
-          <View style={styles.headerLogoWrap}>
-            <Image
-              source={require('@/assets/images/logo.png')}
-              style={styles.headerLogo}
-              resizeMode="contain"
-            />
-          </View>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/settings')}>
-            <Text style={styles.headerBtnText}>🔔</Text>
-          </TouchableOpacity>
+          <Image
+            source={require('@/assets/images/logo.png')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
         </View>
 
         {/* 반려동물 카드 */}
@@ -131,6 +160,11 @@ export default function HomeScreen() {
               <View style={styles.petTagRow}>
                 {pet.breed && <View style={styles.petTag}><Text style={styles.petTagText}>{pet.breed}</Text></View>}
                 {dPlus && <View style={styles.petTag}><Text style={styles.petTagText}>{dPlus}</Text></View>}
+                {careStreak > 0 && (
+                  <View style={styles.petTagStreak}>
+                    <Text style={styles.petTagStreakText}>🔥 {careStreak}일 연속</Text>
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -235,6 +269,20 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* 이번 주 산책 요약 */}
+        {weekWalkKm !== null && (
+          <TouchableOpacity
+            style={styles.walkSummary}
+            onPress={() => router.push('/(tabs)/walk')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.walkSummaryText}>
+              🐾 이번 주 {pet?.name ?? '반려동물'}와 {weekWalkKm.toFixed(1)}km
+            </Text>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        )}
+
         {/* 스마트 추천 배너 */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -296,6 +344,22 @@ export default function HomeScreen() {
 
         <View style={{ height: 16 }} />
       </ScrollView>
+
+      {/* 완료 배너 */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.completionBanner,
+          {
+            opacity: bannerAnim,
+            transform: [{ translateY: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+          },
+        ]}
+      >
+        <Text style={styles.completionBannerText}>
+          오늘 {pet?.name ?? '반려동물'} 케어 완료! 🎉 연속 {careStreak}일째
+        </Text>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -306,13 +370,10 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 100 },
 
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16,
+    alignItems: 'center',
+    paddingTop: 16, paddingBottom: 16,
     backgroundColor: Colors.bg,
   },
-  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerBtnText: { fontSize: 22, color: Colors.text },
-  headerLogoWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerLogo: { height: 44, aspectRatio: 1078 / 451 },
 
   petCard: {
@@ -349,6 +410,12 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 2,
   },
   petTagText: { fontSize: 11, color: Colors.primary, fontWeight: '600' },
+  petTagStreak: {
+    backgroundColor: '#FFF0E0',
+    borderRadius: Radius.pill, paddingHorizontal: 8, paddingVertical: 2,
+    borderWidth: 1, borderColor: '#F5C070',
+  },
+  petTagStreakText: { fontSize: 11, color: '#C47000', fontWeight: '700' },
 
   nextCareBanner: {
     marginHorizontal: 20, marginBottom: 4,
@@ -441,5 +508,28 @@ const styles = StyleSheet.create({
   },
   upcomingLabel: { fontSize: 14, fontWeight: '700', color: Colors.text },
   upcomingWhen: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  walkSummary: {
+    marginHorizontal: 20, marginBottom: 4,
+    borderRadius: Radius.card,
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: Colors.accentLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  walkSummaryText: { fontSize: 14, fontWeight: '700', color: Colors.accent },
+
   chevron: { fontSize: 20, color: Colors.light },
+
+  completionBanner: {
+    position: 'absolute', bottom: 100,
+    alignSelf: 'center',
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 20, paddingVertical: 12,
+    ...Shadow.card,
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.35,
+  },
+  completionBannerText: { color: Colors.white, fontSize: 14, fontWeight: '700' },
 });

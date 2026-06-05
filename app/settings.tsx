@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, Switch, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Switch, Platform, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
@@ -8,13 +9,14 @@ import { supabase } from '@/lib/supabase';
 import { useSettingsStore, formatHour } from '@/stores/settings.store';
 import { useCareStore, isDoneToday } from '@/stores/schedule.store';
 import { usePetStore } from '@/stores/pet.store';
-import { scheduleDailySummary, cancelDailySummary } from '@/lib/notifications';
+import { scheduleDailySummary, cancelDailySummary, scheduleWalkReminder, cancelWalkReminder } from '@/lib/notifications';
 
 export default function SettingsScreen() {
   const {
     summaryHour, setSummaryHour,
     familyNotifEnabled, setFamilyNotifEnabled,
     careNotifPaused, setCareNotifPaused,
+    walkReminderTime, setWalkReminderTime,
     loadSettings,
   } = useSettingsStore();
   const { schedules } = useCareStore();
@@ -23,6 +25,10 @@ export default function SettingsScreen() {
     const d = new Date(); d.setHours(20, 0, 0, 0); return d;
   });
   const [showAndroidPicker, setShowAndroidPicker] = useState(false);
+  const [walkPickerTime, setWalkPickerTime] = useState<Date>(() => {
+    const d = new Date(); d.setHours(18, 0, 0, 0); return d;
+  });
+  const [showWalkPicker, setShowWalkPicker] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => { loadSettings(); }, []);
@@ -32,6 +38,14 @@ export default function SettingsScreen() {
     setPickerTime(d);
   }, [summaryHour]);
 
+  useEffect(() => {
+    if (walkReminderTime) {
+      const [h, m] = walkReminderTime.split(':').map(Number);
+      const d = new Date(); d.setHours(h, m, 0, 0);
+      setWalkPickerTime(d);
+    }
+  }, [walkReminderTime]);
+
   async function handleSaveSummaryHour(hour: number) {
     await setSummaryHour(hour);
     await cancelDailySummary();
@@ -39,6 +53,29 @@ export default function SettingsScreen() {
     if (hasIncomplete) {
       await scheduleDailySummary(pets[0]?.name ?? '반려동물', hour);
     }
+  }
+
+  async function handleWalkReminderChange(date: Date | undefined) {
+    if (!date) return;
+    setWalkPickerTime(date);
+    const h = date.getHours();
+    const m = date.getMinutes();
+    const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    await setWalkReminderTime(timeStr);
+    await scheduleWalkReminder(pets[0]?.name ?? '반려동물', h, m);
+  }
+
+  async function handleCancelWalkReminder() {
+    await setWalkReminderTime(null);
+    await cancelWalkReminder();
+  }
+
+  function formatWalkReminderTime(): string {
+    if (!walkReminderTime) return '설정 안 함';
+    const [h, m] = walkReminderTime.split(':').map(Number);
+    const ampm = h < 12 ? '오전' : '오후';
+    const h12 = h % 12 || 12;
+    return `${ampm} ${h12}:${String(m).padStart(2, '0')}`;
   }
 
   function handleDeleteAccount() {
@@ -125,6 +162,63 @@ export default function SettingsScreen() {
                 />
               )}
             </TouchableOpacity>
+          )}
+
+          {/* 산책 알림 */}
+          {Platform.OS === 'ios' ? (
+            <View style={[styles.row, styles.divider]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel}>산책 알림</Text>
+                <Text style={styles.rowSub}>매일 설정한 시간에 산책을 알려드려요</Text>
+              </View>
+              {walkReminderTime ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <DateTimePicker
+                    value={walkPickerTime}
+                    mode="time"
+                    display="compact"
+                    minuteInterval={5}
+                    onChange={(_: DateTimePickerEvent, d?: Date) => { if (d) handleWalkReminderChange(d); }}
+                  />
+                  <TouchableOpacity onPress={handleCancelWalkReminder}>
+                    <Text style={{ fontSize: 13, color: Colors.danger, fontWeight: '600' }}>끄기</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={() => handleWalkReminderChange(walkPickerTime)}>
+                  <Text style={{ fontSize: 13, color: Colors.primary, fontWeight: '700' }}>설정</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : (
+            <View style={[styles.row, styles.divider]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowLabel}>산책 알림</Text>
+                <Text style={styles.rowSub}>매일 설정한 시간에 산책을 알려드려요</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => walkReminderTime ? handleCancelWalkReminder() : setShowWalkPicker(true)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+              >
+                <Text style={[styles.timeValue, !walkReminderTime && { color: Colors.sub }]}>
+                  {formatWalkReminderTime()}
+                </Text>
+                {walkReminderTime && (
+                  <Text style={{ fontSize: 12, color: Colors.danger, fontWeight: '600' }}>끄기</Text>
+                )}
+              </TouchableOpacity>
+              {showWalkPicker && (
+                <DateTimePicker
+                  value={walkPickerTime}
+                  mode="time"
+                  minuteInterval={5}
+                  onChange={(_: DateTimePickerEvent, d?: Date) => {
+                    setShowWalkPicker(false);
+                    if (d) handleWalkReminderChange(d);
+                  }}
+                />
+              )}
+            </View>
           )}
 
           {/* 가족 케어 등록 알림 */}

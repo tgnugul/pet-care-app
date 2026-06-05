@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Alert, Platform,
+  View, Text, TouchableOpacity, StyleSheet, Alert, Platform, Pressable,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Location from 'expo-location';
@@ -13,7 +14,7 @@ import { Colors, Radius, Shadow } from '@/constants/design';
 import { supabase } from '@/lib/supabase';
 import { useWalkStore } from '@/stores/walk.store';
 import { WALK_LOCATION_TASK, WALK_ROUTE_KEY } from '@/lib/walk-task';
-import { setWalkState, clearWalkState } from '@/lib/widget-storage';
+import { setWalkState, clearWalkState, getWalkState } from '@/lib/widget-storage';
 
 type Coord = { latitude: number; longitude: number };
 
@@ -217,7 +218,7 @@ function MapSection({ region, route, mapRef, webViewRef }: {
 
 export default function WalkActiveScreen() {
   const { fetchLogs } = useWalkStore();
-  const { autostart } = useLocalSearchParams<{ autostart?: string }>();
+  const { autostart, autostop } = useLocalSearchParams<{ autostart?: string; autostop?: string }>();
   const [isTracking, setIsTracking] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [distance, setDistance] = useState(0);
@@ -227,12 +228,24 @@ export default function WalkActiveScreen() {
     latitudeDelta: number; longitudeDelta: number;
   } | null>(null);
   const [permGranted, setPermGranted] = useState(false);
+  const [completion, setCompletion] = useState<{ elapsed: number; dist: number } | null>(null);
+
+  const navigation = useNavigation();
+  const autostartDismissRef = useRef(false);
+
+  function goBack() {
+    setTimeout(() => {
+      if (navigation.canGoBack()) navigation.goBack();
+      else router.replace('/');
+    }, 0);
+  }
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastCoord = useRef<Coord | null>(null);
   const startedAt = useRef<string | null>(null);
   const startTimestamp = useRef<number | null>(null);
+  const distanceRef = useRef(0);
   const mapRef = useRef<any>(null);
   const webViewRef = useRef<any>(null);
 
@@ -244,21 +257,39 @@ export default function WalkActiveScreen() {
 
   useEffect(() => {
     initMap();
-    return () => stopAll();
+    return () => {
+      timerRef.current && clearInterval(timerRef.current);
+      pollRef.current && clearInterval(pollRef.current);
+      // autostart 모드로 dismiss할 때는 GPS를 유지 (백그라운드에서 계속 추적)
+      if (!autostartDismissRef.current) {
+        Location.stopLocationUpdatesAsync(WALK_LOCATION_TASK).catch(() => {});
+      }
+    };
   }, []);
 
-  // 위젯에서 autostart=true로 진입하면 권한 확인 후 자동 시작
+  // 위젯에서 autostart=true로 진입하면 권한 확인 후 자동 시작 → GPS 시작 후 화면 닫기
   useEffect(() => {
     if (autostart === 'true' && permGranted && !isTracking) {
-      handleStart();
+      (async () => {
+        await handleStart();
+        autostartDismissRef.current = true; // GPS 유지하면서 화면만 닫음
+        setTimeout(() => goBack(), 300);
+      })();
     }
   }, [permGranted]);
+
+  // 위젯 종료 버튼으로 진입하면 산책 복원 후 자동 종료
+  useEffect(() => {
+    if (autostop === 'true' && isTracking) {
+      handleStop();
+    }
+  }, [isTracking]);
 
   async function initMap() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('위치 권한 필요', '산책 기록을 위해 위치 권한이 필요해요.', [
-        { text: '확인', onPress: () => router.back() },
+        { text: '확인', onPress: () => router.dismiss() },
       ]);
       return;
     }
@@ -291,6 +322,17 @@ export default function WalkActiveScreen() {
           }, 1000);
 
           pollRef.current = setInterval(async () => {
+            const walkState = await getWalkState();
+            if (!walkState) {
+              stopAll();
+              const finalElapsed = startTimestamp.current
+                ? Math.floor((Date.now() - startTimestamp.current) / 1000)
+                : 0;
+              setIsTracking(false);
+              setCompletion({ elapsed: finalElapsed, dist: distanceRef.current });
+              fetchLogs();
+              return;
+            }
             const stored = await AsyncStorage.getItem(WALK_ROUTE_KEY);
             if (!stored) return;
             const newRoute: Coord[] = JSON.parse(stored);
@@ -304,6 +346,7 @@ export default function WalkActiveScreen() {
                 total += calcDistance(newRoute[i - 1].latitude, newRoute[i - 1].longitude, newRoute[i].latitude, newRoute[i].longitude);
               }
               setDistance(total);
+              distanceRef.current = total;
             }
           }, 2000);
 
@@ -349,6 +392,17 @@ export default function WalkActiveScreen() {
     });
 
     pollRef.current = setInterval(async () => {
+      const walkState = await getWalkState();
+      if (!walkState) {
+        stopAll();
+        const finalElapsed = startTimestamp.current
+          ? Math.floor((Date.now() - startTimestamp.current) / 1000)
+          : 0;
+        setIsTracking(false);
+        setCompletion({ elapsed: finalElapsed, dist: distanceRef.current });
+        fetchLogs();
+        return;
+      }
       const stored = await AsyncStorage.getItem(WALK_ROUTE_KEY);
       if (!stored) return;
       const newRoute: Coord[] = JSON.parse(stored);
@@ -362,6 +416,7 @@ export default function WalkActiveScreen() {
           total += calcDistance(newRoute[i - 1].latitude, newRoute[i - 1].longitude, newRoute[i].latitude, newRoute[i].longitude);
         }
         setDistance(total);
+        distanceRef.current = total;
       }
     }, 2000);
   }
@@ -392,14 +447,23 @@ export default function WalkActiveScreen() {
       });
       await fetchLogs();
     }
-    Alert.alert(
-      '산책 완료! 🐾',
-      `시간: ${formatDuration(elapsed)}\n거리: ${totalDistance.toFixed(2)}km`,
-      [{ text: '확인', onPress: () => router.back() }],
-    );
+
+    if (Platform.OS === 'android') {
+      try {
+        const { requestWidgetUpdate } = await import('react-native-android-widget');
+        const { WalkWidget } = await import('@/widgets/WalkWidget');
+        await requestWidgetUpdate({
+          widgetName: 'WalkWidget',
+          renderWidget: () => WalkWidget({ state: null }),
+          widgetNotFound: () => {},
+        });
+      } catch {}
+    }
+
+    setCompletion({ elapsed, dist: totalDistance });
   }
 
-  function handleClose() {
+  async function handleClose() {
     if (isTracking && elapsed > 0) {
       Alert.alert('산책을 종료할까요?', '지금까지의 기록은 저장되지 않아요.', [
         { text: '계속 산책', style: 'cancel' },
@@ -407,14 +471,36 @@ export default function WalkActiveScreen() {
           text: '종료', style: 'destructive', onPress: async () => {
             stopAll();
             await clearWalkState();
-            router.back();
+            if (Platform.OS === 'android') {
+              try {
+                const { requestWidgetUpdate } = await import('react-native-android-widget');
+                const { WalkWidget } = await import('@/widgets/WalkWidget');
+                await requestWidgetUpdate({
+                  widgetName: 'WalkWidget',
+                  renderWidget: () => WalkWidget({ state: null }),
+                  widgetNotFound: () => {},
+                });
+              } catch {}
+            }
+            goBack();
           },
         },
       ]);
     } else {
       stopAll();
-      clearWalkState();
-      router.back();
+      await clearWalkState();
+      if (Platform.OS === 'android') {
+        try {
+          const { requestWidgetUpdate } = await import('react-native-android-widget');
+          const { WalkWidget } = await import('@/widgets/WalkWidget');
+          await requestWidgetUpdate({
+            widgetName: 'WalkWidget',
+            renderWidget: () => WalkWidget({ state: null }),
+            widgetNotFound: () => {},
+          });
+        } catch {}
+      }
+      goBack();
     }
   }
 
@@ -454,6 +540,22 @@ export default function WalkActiveScreen() {
           )}
         </View>
       </SafeAreaView>
+
+      {/* 산책 완료 오버레이 — Alert 대신 컴포넌트 내 UI로 처리 (navigation 안정성) */}
+      {completion && (
+        <Pressable style={styles.completionOverlay} onPress={goBack}>
+          <View style={styles.completionCard}>
+            <Text style={styles.completionEmoji}>🐾</Text>
+            <Text style={styles.completionTitle}>산책 완료!</Text>
+            <Text style={styles.completionStat}>
+              {formatDuration(completion.elapsed)}  ·  {completion.dist.toFixed(2)}km
+            </Text>
+            <TouchableOpacity style={styles.completionBtn} onPress={goBack}>
+              <Text style={styles.completionBtnText}>확인</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -514,4 +616,28 @@ const styles = StyleSheet.create({
   },
   stopIcon: { width: 20, height: 20, borderRadius: 4, backgroundColor: Colors.white },
   actionLabel: { fontSize: 10, color: Colors.white, fontWeight: '700' },
+
+  completionOverlay: {
+    position: 'absolute', inset: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  completionCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    paddingVertical: 36, paddingHorizontal: 40,
+    alignItems: 'center', gap: 12,
+    ...Shadow.card,
+  },
+  completionEmoji: { fontSize: 48 },
+  completionTitle: { fontSize: 24, fontWeight: '800', color: Colors.text },
+  completionStat: { fontSize: 16, color: Colors.sub, fontWeight: '600' },
+  completionBtn: {
+    marginTop: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    paddingHorizontal: 40, paddingVertical: 14,
+    ...Shadow.sm,
+  },
+  completionBtnText: { color: Colors.white, fontSize: 16, fontWeight: '800' },
 });

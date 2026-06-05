@@ -24,7 +24,6 @@ function getPasswordStrength(pw: string): { level: 0 | 1 | 2 | 3; label: string;
 }
 
 export default function SignupScreen() {
-  const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -67,7 +66,6 @@ export default function SignupScreen() {
   }
 
   async function handleSignup() {
-    if (!nickname.trim()) return;
     if (!EMAIL_REGEX.test(email.trim())) {
       Alert.alert('이메일 오류', '올바른 이메일 형식을 입력해주세요.');
       return;
@@ -89,7 +87,6 @@ export default function SignupScreen() {
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { display_name: nickname.trim() } },
     });
     setLoading(false);
 
@@ -102,11 +99,11 @@ export default function SignupScreen() {
         [{ text: '확인', onPress: () => router.replace('/(auth)/login') }],
       );
     } else {
-      router.replace('/(onboarding)/welcome');
+      router.replace('/nickname-setup');
     }
   }
 
-  const ready = nickname.trim() && EMAIL_REGEX.test(email) && password && password === confirmPassword && agreedTerms && !loading;
+  const ready = EMAIL_REGEX.test(email) && password && password === confirmPassword && agreedTerms && !loading;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -121,17 +118,6 @@ export default function SignupScreen() {
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
           <Text style={styles.formTitle}>회원가입</Text>
-
-          {/* 닉네임 */}
-          <TextInput
-            style={styles.input}
-            placeholder="닉네임"
-            placeholderTextColor={Colors.light}
-            value={nickname}
-            onChangeText={setNickname}
-            autoCorrect={false}
-            maxLength={20}
-          />
 
           {/* 이메일 */}
           <View>

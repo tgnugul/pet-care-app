@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Radius, Shadow } from '@/constants/design';
@@ -38,6 +39,12 @@ export default function WelcomeScreen() {
             <Text style={styles.choiceNoSub}>설문으로 맞는 동물을 찾아볼게요</Text>
           </TouchableOpacity>
         </View>
+
+        <TouchableOpacity style={styles.loginLink} onPress={() => router.replace('/(auth)/login')}>
+          <Text style={styles.loginLinkText}>
+            이미 계정이 있으신가요? <Text style={styles.loginLinkBold}>로그인</Text>
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -77,4 +84,8 @@ const styles = StyleSheet.create({
   },
   choiceNoLabel: { fontSize: 18, fontWeight: '800', color: Colors.text },
   choiceNoSub: { fontSize: 13, color: Colors.sub },
+
+  loginLink: { alignItems: 'center', paddingVertical: 8 },
+  loginLinkText: { fontSize: 14, color: Colors.sub },
+  loginLinkBold: { color: Colors.primary, fontWeight: '700' },
 });

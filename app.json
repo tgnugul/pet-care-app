@@ -36,9 +36,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#FAF5EE",
           "dark": {
-            "backgroundColor": "#ffffff"
+            "backgroundColor": "#FAF5EE"
           }
         }
       ],
@@ -72,9 +72,9 @@
               "targetCellWidth": 2,
               "targetCellHeight": 2,
               "description": "오늘의 반려동물 케어 일정",
-              "previewImage": "./assets/images/widget-preview.png",
+              "previewImage": "./assets/images/care-widget-preview.png",
               "updatePeriodMillis": 1800000,
-              "resizeMode": "both"
+              "resizeMode": "horizontal|vertical"
             },
             {
               "name": "WalkWidget",
@@ -84,9 +84,9 @@
               "targetCellWidth": 2,
               "targetCellHeight": 2,
               "description": "산책 시작 및 현황",
-              "previewImage": "./assets/images/widget-preview.png",
+              "previewImage": "./assets/images/walk-widget-preview.png",
               "updatePeriodMillis": 1800000,
-              "resizeMode": "both"
+              "resizeMode": "horizontal|vertical"
             }
           ]
         }

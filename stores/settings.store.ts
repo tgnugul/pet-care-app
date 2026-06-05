@@ -5,30 +5,36 @@ import * as Notifications from 'expo-notifications';
 const KEY_SUMMARY_HOUR = 'notif_summary_hour';
 const KEY_FAMILY_NOTIF = 'notif_family_enabled';
 const KEY_CARE_PAUSED = 'notif_care_paused';
+const KEY_WALK_REMINDER = 'notif_walk_reminder'; // "HH:MM" or ""
 
 interface SettingsStore {
   summaryHour: number;
   familyNotifEnabled: boolean;
   careNotifPaused: boolean;
+  walkReminderTime: string | null; // "HH:MM" or null
   loadSettings: () => Promise<void>;
   setSummaryHour: (hour: number) => Promise<void>;
   setFamilyNotifEnabled: (val: boolean) => Promise<void>;
   setCareNotifPaused: (val: boolean) => Promise<void>;
+  setWalkReminderTime: (time: string | null) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
   summaryHour: 20,
   familyNotifEnabled: true,
   careNotifPaused: false,
+  walkReminderTime: null,
 
   loadSettings: async () => {
     const hour = await SecureStore.getItemAsync(KEY_SUMMARY_HOUR);
     const family = await SecureStore.getItemAsync(KEY_FAMILY_NOTIF);
     const paused = await SecureStore.getItemAsync(KEY_CARE_PAUSED);
+    const walk = await SecureStore.getItemAsync(KEY_WALK_REMINDER);
     set({
       ...(hour !== null && { summaryHour: parseInt(hour, 10) }),
       ...(family !== null && { familyNotifEnabled: family === 'true' }),
       ...(paused !== null && { careNotifPaused: paused === 'true' }),
+      walkReminderTime: walk || null,
     });
   },
 
@@ -46,6 +52,11 @@ export const useSettingsStore = create<SettingsStore>((set) => ({
     await SecureStore.setItemAsync(KEY_CARE_PAUSED, String(val));
     set({ careNotifPaused: val });
     if (val) await Notifications.cancelAllScheduledNotificationsAsync();
+  },
+
+  setWalkReminderTime: async (time) => {
+    await SecureStore.setItemAsync(KEY_WALK_REMINDER, time ?? '');
+    set({ walkReminderTime: time });
   },
 }));
 

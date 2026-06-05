@@ -11,20 +11,11 @@ interface SubscriptionStore {
 }
 
 export const useSubscriptionStore = create<SubscriptionStore>((set) => ({
-  isPremium: false,
+  isPremium: true, // 전면 무료 개방 — 수익화 재도입 시 false로 변경 후 fetchStatus 복구
   loading: false,
 
   fetchStatus: async () => {
-    if (!isRevenueCatReady()) return;
-    set({ loading: true });
-    try {
-      const info = await Purchases.getCustomerInfo();
-      set({ isPremium: info.entitlements.active[ENTITLEMENT_ID] !== undefined });
-    } catch {
-      // 무시 — 기본값 false 유지
-    } finally {
-      set({ loading: false });
-    }
+    // 전면 무료 개방 중 비활성화
   },
 
   purchase: async () => {

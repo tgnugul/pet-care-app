@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet,
-  SafeAreaView, ScrollView, Alert, ActivityIndicator, Switch, Platform, Image,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Switch, Platform, Image, Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -12,7 +12,10 @@ import { useCareStore, CARE_TYPE_META, CARE_TYPE_IMAGES, CareType, Frequency } f
 import { scheduleNotification, cancelNotification, notifyFamilyNewCare } from '@/lib/notifications';
 import { useFamilyStore } from '@/stores/family.store';
 
-const TYPES: CareType[] = ['meal', 'medicine', 'hospital', 'ear_cleaning', 'bath', 'nail', 'other'];
+const SCREEN_W = Dimensions.get('window').width;
+const MONTH_DAY_BTN_SIZE = Math.floor((SCREEN_W - 40 - 6 * 5) / 7);
+
+const TYPES: CareType[] = ['meal', 'medicine', 'hospital', 'ear_cleaning', 'bath', 'other'];
 const FREQUENCIES: { value: Frequency; label: string }[] = [
   { value: 'daily', label: '매일' },
   { value: 'weekly', label: '매주' },
@@ -50,6 +53,7 @@ export default function CareAddScreen() {
   const [label, setLabel] = useState('');
   const [frequency, setFrequency] = useState<Frequency>('daily');
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
+  const [dayOfMonth, setDayOfMonth] = useState<number>(new Date().getDate());
   const [hasTime, setHasTime] = useState(true);
   const [selectedTime, setSelectedTime] = useState<Date>(defaultTime);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -68,6 +72,7 @@ export default function CareAddScreen() {
     setLabel(s.label !== CARE_TYPE_META[s.type].label ? s.label : '');
     setFrequency(s.frequency);
     if (s.days_of_week?.length) setDaysOfWeek(s.days_of_week);
+    if (s.frequency === 'monthly') setDayOfMonth(new Date(s.next_due_at).getDate());
     const d = new Date(s.next_due_at);
     const noTime = d.getHours() === 0 && d.getMinutes() === 0;
     setHasTime(!noTime);
@@ -97,6 +102,15 @@ export default function CareAddScreen() {
       const daysUntil = nextDay >= today ? nextDay - today : 7 - today + nextDay;
       base = new Date();
       base.setDate(base.getDate() + daysUntil);
+    } else if (frequency === 'monthly') {
+      const now = new Date();
+      let year = now.getFullYear();
+      let month = now.getMonth();
+      if (now.getDate() >= dayOfMonth) {
+        month += 1;
+        if (month > 11) { month = 0; year += 1; }
+      }
+      base = new Date(year, month, dayOfMonth);
     } else {
       base = new Date();
     }
@@ -222,6 +236,27 @@ export default function CareAddScreen() {
                     }
                   >
                     <Text style={[styles.dayLabel, active && styles.dayLabelActive]}>{dayName}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {/* 매월: 일(day) 선택 */}
+        {frequency === 'monthly' && (
+          <>
+            <Text style={styles.sectionLabel}>날짜 선택 * <Text style={styles.optional}>(매달 {dayOfMonth}일)</Text></Text>
+            <View style={styles.monthDayGrid}>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
+                const active = dayOfMonth === day;
+                return (
+                  <TouchableOpacity
+                    key={day}
+                    style={[styles.monthDayBtn, active && styles.dayBtnActive]}
+                    onPress={() => setDayOfMonth(day)}
+                  >
+                    <Text style={[styles.monthDayLabel, active && styles.dayLabelActive]}>{day}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -387,6 +422,14 @@ const styles = StyleSheet.create({
   dayBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   dayLabel: { fontSize: 13, fontWeight: '700', color: Colors.sub },
   dayLabelActive: { color: Colors.primary },
+
+  monthDayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 4 },
+  monthDayBtn: {
+    width: MONTH_DAY_BTN_SIZE, height: MONTH_DAY_BTN_SIZE,
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: Radius.button,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white,
+  },
+  monthDayLabel: { fontSize: 13, fontWeight: '700', color: Colors.sub },
 
   datePickerBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

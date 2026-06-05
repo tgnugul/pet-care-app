@@ -11,19 +11,33 @@ export default function RootIndex() {
   const [dest, setDest] = useState<Dest | null>(null);
 
   useEffect(() => {
-    async function check() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setDest('/(auth)/login'); return; }
+    let mounted = true;
+
+    // getSession()은 SecureStore 복구 완료 전에 호출되면 null을 반환할 수 있음.
+    // INITIAL_SESSION은 저장소 복구가 끝난 뒤 정확히 한 번 발생하므로 안전함.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event !== 'INITIAL_SESSION' || !mounted) return;
+
+      if (!session) {
+        if (mounted) setDest('/(auth)/login');
+        return;
+      }
 
       const onboardingSeen = await AsyncStorage.getItem('onboarding_seen');
+      if (!mounted) return;
       if (onboardingSeen === 'true') { setDest('/(tabs)'); return; }
 
       const { count } = await supabase
         .from('pets')
         .select('id', { count: 'exact', head: true });
+      if (!mounted) return;
       setDest(count === 0 ? '/(onboarding)/welcome' : '/(tabs)');
-    }
-    check();
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   if (!dest) {

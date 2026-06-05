@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '@/lib/supabase';
-import type { CareSchedule, Frequency } from '@/stores/schedule.store';
+import type { CareSchedule, CareType, Frequency } from '@/stores/schedule.store';
 import { useSettingsStore } from '@/stores/settings.store';
 
 Notifications.setNotificationHandler({
@@ -44,6 +44,70 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return status === 'granted';
 }
 
+// ── 알림 문구 ────────────────────────────────────────────────────────
+
+function buildNotifContent(
+  type: CareType,
+  label: string,
+  petName: string,
+): { title: string; body: string } {
+  switch (type) {
+    case 'meal':
+      return {
+        title: `${petName} ${label} 시간이에요 🍚`,
+        body: '따뜻하게 챙겨주세요',
+      };
+    case 'medicine':
+      return {
+        title: `오늘 ${label} 빠뜨리지 마세요 💊`,
+        body: `${petName}의 건강을 위해 지금 챙겨주세요`,
+      };
+    case 'hospital':
+      return {
+        title: `오늘 ${label} 예약일이에요 🏥`,
+        body: '미리 챙겨두세요',
+      };
+    case 'ear_cleaning':
+    case 'bath':
+    case 'nail':
+      return {
+        title: `${petName} ${label} 날이에요 🛁`,
+        body: '오늘도 뽀송하게',
+      };
+    default:
+      return {
+        title: `${label} 시간이에요 🐾`,
+        body: `${petName}의 일정이에요`,
+      };
+  }
+}
+
+function buildMorningContent(
+  type: CareType,
+  label: string,
+  petName: string,
+): { title: string; body: string } {
+  switch (type) {
+    case 'hospital':
+      return {
+        title: `오늘 ${label} 예약이 있어요 🏥`,
+        body: `${petName} 데려갈 준비 미리 해두세요`,
+      };
+    case 'medicine':
+      return {
+        title: `오늘 ${label} 잊지 마세요 💊`,
+        body: `${petName}의 약, 오늘 챙겨줘야 해요`,
+      };
+    default:
+      return {
+        title: `오늘 ${label} 일정이 있어요 ☀️`,
+        body: `${petName}의 일정을 미리 확인해두세요`,
+      };
+  }
+}
+
+// ── 트리거 빌더 ──────────────────────────────────────────────────────
+
 type Trigger = Notifications.NotificationTriggerInput;
 
 function buildTrigger(frequency: Frequency, fireAt: Date): Trigger {
@@ -56,20 +120,15 @@ function buildTrigger(frequency: Frequency, fireAt: Date): Trigger {
   if (frequency === 'weekly') {
     return {
       type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-      weekday: fireAt.getDay() + 1, // expo: 1=일 ~ 7=토
+      weekday: fireAt.getDay() + 1,
       hour,
       minute,
     };
   }
-  // monthly / custom: 1회성 DATE 트리거
   return { type: Notifications.SchedulableTriggerInputTypes.DATE, date: fireAt };
 }
 
-const REMINDER_STEPS = [
-  { offsetMin: 30, suffix: '-30m', title: '30분 후 케어 예정이에요 🐾', bodyTpl: (label: string, pet: string) => `${pet}의 ${label}까지 30분 남았어요` },
-  { offsetMin: 10, suffix: '-10m', title: '10분 후 케어 예정이에요 🐾', bodyTpl: (label: string, pet: string) => `${pet}의 ${label}까지 10분 남았어요` },
-  { offsetMin: 0,  suffix: '',     title: '케어 시간이에요! 🐾',       bodyTpl: (label: string, pet: string) => `${pet}의 ${label} 시간이에요` },
-];
+// ── 알림 예약 ────────────────────────────────────────────────────────
 
 export async function scheduleNotification(
   schedule: CareSchedule,
@@ -83,87 +142,95 @@ export async function scheduleNotification(
   }
 
   const due = new Date(schedule.next_due_at);
-  const now = new Date();
+  const content = buildNotifContent(schedule.type, schedule.label, petName);
 
-  for (const step of REMINDER_STEPS) {
-    const fireAt = new Date(due.getTime() - step.offsetMin * 60 * 1000);
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: schedule.id,
+      content: {
+        title: content.title,
+        body: content.body,
+        sound: true,
+        data: { scheduleId: schedule.id, petId: schedule.pet_id, petName },
+        categoryIdentifier: 'CARE_DONE',
+      },
+      trigger: buildTrigger(schedule.frequency, due),
+    });
+  } catch {}
 
-    // monthly/custom는 이미 지난 시각이면 건너뜀
-    if ((schedule.frequency === 'monthly' || schedule.frequency === 'custom') && fireAt <= now) {
-      continue;
-    }
-
-    try {
-      await Notifications.scheduleNotificationAsync({
-        identifier: `${schedule.id}${step.suffix}`,
-        content: {
-          title: step.title,
-          body: step.bodyTpl(schedule.label, petName),
-          sound: true,
-          data: { scheduleId: schedule.id, petId: schedule.pet_id, petName },
-          ...(step.suffix === '' ? { categoryIdentifier: 'CARE_DONE' } : {}),
-        },
-        trigger: buildTrigger(schedule.frequency, fireAt),
-      });
-    } catch {
-      // 권한 없을 때 조용히 무시
-    }
+  // monthly/custom 일정은 당일 아침 8시에 예고 알림 추가
+  if (schedule.frequency === 'monthly' || schedule.frequency === 'custom') {
+    await scheduleMorningHeadsUp(schedule, petName);
   }
 }
 
-async function scheduleMultiDayWeekly(schedule: CareSchedule, petName: string): Promise<void> {
+async function scheduleMultiDayWeekly(
+  schedule: CareSchedule,
+  petName: string,
+): Promise<void> {
   const due = new Date(schedule.next_due_at);
-  const baseHour = due.getHours();
-  const baseMinute = due.getMinutes();
+  const hour = due.getHours();
+  const minute = due.getMinutes();
+  const content = buildNotifContent(schedule.type, schedule.label, petName);
 
   for (const day of schedule.days_of_week!) {
-    for (const step of REMINDER_STEPS) {
-      const totalMinutes = baseHour * 60 + baseMinute - step.offsetMin;
-      if (totalMinutes < 0) continue; // 자정 이전으로 넘어가는 경우 스킵
-
-      const fireHour = Math.floor(totalMinutes / 60);
-      const fireMinute = totalMinutes % 60;
-      // Expo weekday: 1=일(JS 0) ~ 7=토(JS 6)
-      const expoWeekday = day + 1;
-
-      try {
-        await Notifications.scheduleNotificationAsync({
-          identifier: `${schedule.id}-d${day}${step.suffix}`,
-          content: {
-            title: step.title,
-            body: step.bodyTpl(schedule.label, petName),
-            sound: true,
-            data: { scheduleId: schedule.id, petId: schedule.pet_id, petName },
-            ...(step.suffix === '' ? { categoryIdentifier: 'CARE_DONE' } : {}),
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
-            weekday: expoWeekday,
-            hour: fireHour,
-            minute: fireMinute,
-          },
-        });
-      } catch {
-        // 권한 없을 때 조용히 무시
-      }
-    }
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `${schedule.id}-d${day}`,
+        content: {
+          title: content.title,
+          body: content.body,
+          sound: true,
+          data: { scheduleId: schedule.id, petId: schedule.pet_id, petName },
+          categoryIdentifier: 'CARE_DONE',
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          weekday: day + 1,
+          hour,
+          minute,
+        },
+      });
+    } catch {}
   }
+}
+
+async function scheduleMorningHeadsUp(
+  schedule: CareSchedule,
+  petName: string,
+): Promise<void> {
+  const due = new Date(schedule.next_due_at);
+  const morning = new Date(due.getFullYear(), due.getMonth(), due.getDate(), 8, 0, 0);
+  if (morning <= new Date()) return;
+
+  const content = buildMorningContent(schedule.type, schedule.label, petName);
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: `${schedule.id}-morning`,
+      content: {
+        title: content.title,
+        body: content.body,
+        sound: true,
+        data: { scheduleId: schedule.id, petId: schedule.pet_id, petName },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: morning,
+      },
+    });
+  } catch {}
 }
 
 export async function cancelNotification(scheduleId: string): Promise<void> {
-  const suffixes = ['', '-30m', '-10m'];
-  for (const suffix of suffixes) {
-    try { await Notifications.cancelScheduledNotificationAsync(`${scheduleId}${suffix}`); } catch {}
-  }
-  // 요일별 알림도 취소 (이전에 다중 요일 설정이 있었을 경우 대비)
+  const ids = [scheduleId, `${scheduleId}-morning`];
   for (let day = 0; day <= 6; day++) {
-    for (const suffix of suffixes) {
-      try { await Notifications.cancelScheduledNotificationAsync(`${scheduleId}-d${day}${suffix}`); } catch {}
-    }
+    ids.push(`${scheduleId}-d${day}`);
+  }
+  for (const id of ids) {
+    try { await Notifications.cancelScheduledNotificationAsync(id); } catch {}
   }
 }
 
-/** 완료 처리 후 monthly/custom 알림 재예약 */
 export async function rescheduleAfterDone(
   schedule: CareSchedule,
   petName: string,
@@ -173,23 +240,23 @@ export async function rescheduleAfterDone(
   await scheduleNotification(schedule, petName);
 }
 
-// ── 일일 미완료 요약 알림 ─────────────────────────────────────────
+// ── 저녁 미완료 요약 알림 ────────────────────────────────────────────
+
 const SUMMARY_ID = 'daily-care-summary';
-const SUMMARY_HOUR = 20; // 오후 8시
+const SUMMARY_HOUR = 20;
 
 export async function scheduleDailySummary(petName: string, hour = SUMMARY_HOUR): Promise<void> {
   const now = new Date();
   const fireAt = new Date();
   fireAt.setHours(hour, 0, 0, 0);
-
-  if (fireAt <= now) return; // 이미 지난 시간이면 스케줄 안 함
+  if (fireAt <= now) return;
 
   try {
     await Notifications.scheduleNotificationAsync({
       identifier: SUMMARY_ID,
       content: {
-        title: '오늘 케어 일정이 남아있어요 🐾',
-        body: `${petName}의 미완료 케어를 확인해보세요`,
+        title: `${petName}의 오늘 케어가 남아있어요 🌙`,
+        body: '자기 전에 한 번만 확인해봐요',
         sound: true,
         data: { type: 'daily-summary' },
       },
@@ -198,22 +265,41 @@ export async function scheduleDailySummary(petName: string, hour = SUMMARY_HOUR)
         date: fireAt,
       },
     });
-  } catch {
-    // 권한 없을 때 무시
-  }
+  } catch {}
 }
 
 export async function cancelDailySummary(): Promise<void> {
-  try {
-    await Notifications.cancelScheduledNotificationAsync(SUMMARY_ID);
-  } catch {
-    // 이미 없는 경우 무시
-  }
+  try { await Notifications.cancelScheduledNotificationAsync(SUMMARY_ID); } catch {}
 }
 
-// ── 가족 공유 푸시 알림 ───────────────────────────────────────────
+const WALK_REMINDER_ID = 'walk-reminder';
 
-/** 로그인/앱 시작 시 Expo 푸시 토큰을 Supabase에 등록 */
+export async function scheduleWalkReminder(petName: string, hour: number, minute: number): Promise<void> {
+  await cancelWalkReminder();
+  try {
+    await Notifications.scheduleNotificationAsync({
+      identifier: WALK_REMINDER_ID,
+      content: {
+        title: `${petName} 산책 시간이에요! 🐾`,
+        body: '오늘 산책 아직 안 했죠? 지금 나가요!',
+        sound: true,
+        data: { type: 'walk-reminder' },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour,
+        minute,
+      },
+    });
+  } catch {}
+}
+
+export async function cancelWalkReminder(): Promise<void> {
+  try { await Notifications.cancelScheduledNotificationAsync(WALK_REMINDER_ID); } catch {}
+}
+
+// ── 가족 공유 푸시 알림 ──────────────────────────────────────────────
+
 export async function registerPushToken(): Promise<void> {
   if (Platform.OS === 'web') return;
   const { data: { session } } = await supabase.auth.getSession();
@@ -232,12 +318,9 @@ export async function registerPushToken(): Promise<void> {
       token: tokenData.data,
       updated_at: new Date().toISOString(),
     });
-  } catch {
-    // 시뮬레이터 등 토큰 발급 불가 환경은 무시
-  }
+  } catch {}
 }
 
-/** 가족 멤버에게 새 케어 등록 알림 발송 (fire-and-forget) */
 export async function notifyFamilyNewCare(
   familyId: string,
   myUserId: string,
@@ -255,8 +338,8 @@ export async function notifyFamilyNewCare(
 
     const messages = (rows as { token: string }[]).map(({ token }) => ({
       to: token,
-      title: '새 케어 일정이 추가됐어요 🐾',
-      body: `${petName}의 ${careLabel} 일정이 등록됐어요`,
+      title: `${petName} 케어가 추가됐어요 🐾`,
+      body: `${petName}의 ${careLabel}, 같이 챙겨봐요!`,
       sound: 'default',
     }));
 
@@ -265,7 +348,36 @@ export async function notifyFamilyNewCare(
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify(messages),
     });
-  } catch {
-    // 알림 전송 실패는 케어 저장에 영향 없음
-  }
+  } catch {}
+}
+
+export async function notifyFamilyCareCompleted(
+  familyId: string,
+  myUserId: string,
+  doerName: string,
+  careLabel: string,
+  petName: string,
+): Promise<void> {
+  if (!useSettingsStore.getState().familyNotifEnabled) return;
+
+  try {
+    const { data: rows } = await supabase.rpc('get_family_push_tokens', {
+      p_family_id: familyId,
+      p_my_user_id: myUserId,
+    });
+    if (!rows?.length) return;
+
+    const messages = (rows as { token: string }[]).map(({ token }) => ({
+      to: token,
+      title: `${petName} 케어 완료 ✅`,
+      body: `${doerName}님이 ${petName}의 ${careLabel} 케어를 완료했어요`,
+      sound: 'default',
+    }));
+
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(messages),
+    });
+  } catch {}
 }

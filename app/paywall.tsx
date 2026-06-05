@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, Alert, ScrollView,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { useSubscriptionStore } from '@/stores/subscription.store';

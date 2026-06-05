@@ -1,5 +1,9 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# AI 에이전트 환경변수
+agents/.env
+agents/context/outputs/
+
 # dependencies
 node_modules/
 

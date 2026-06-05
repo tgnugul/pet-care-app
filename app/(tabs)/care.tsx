@@ -1,41 +1,44 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  SafeAreaView, ActivityIndicator, Alert, Image,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { usePetStore } from '@/stores/pet.store';
-import { useCareStore, CARE_TYPE_META, CARE_TYPE_IMAGES, isDoneToday, localDateStr, CareSchedule, Frequency } from '@/stores/schedule.store';
+import { useCareStore, CARE_TYPE_IMAGES, isDoneToday, localDateStr, CareSchedule, Frequency } from '@/stores/schedule.store';
 
-type Tab = 'today' | 'week' | 'all';
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'today', label: '오늘' },
-  { id: 'week', label: '이번 주' },
-  { id: 'all', label: '전체' },
-];
+function formatUpcomingDate(iso: string): string {
+  const due = new Date(iso);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
 
-function isThisWeek(dateStr: string): boolean {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const weekEnd = new Date(now);
-  weekEnd.setDate(now.getDate() + (6 - now.getDay()));
-  weekEnd.setHours(23, 59, 59, 999);
-  return d <= weekEnd;
-}
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  if (dueDay.getTime() === tomorrow.getTime()) return '내일';
 
-function isToday(dateStr: string): boolean {
-  return dateStr.slice(0, 10) === new Date().toISOString().slice(0, 10);
-}
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay());
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6);
 
-function filterByTab(schedules: CareSchedule[], tab: Tab): CareSchedule[] {
-  if (tab === 'all') return schedules;
-  if (tab === 'today') {
-    return schedules.filter(s => s.frequency === 'daily' || localDateStr(new Date(s.next_due_at)) <= localDateStr());
+  if (dueDay > today && dueDay <= endOfWeek) {
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return `이번 주 ${days[due.getDay()]}요일`;
   }
-  return schedules.filter(s =>
-    s.frequency === 'daily' || s.frequency === 'weekly' || isThisWeek(s.next_due_at),
-  );
+
+  return `${due.getMonth() + 1}월 ${due.getDate()}일`;
+}
+
+function sortCareItems(items: CareSchedule[]): CareSchedule[] {
+  return [...items].sort((a, b) => {
+    const aDone = isDoneToday(a);
+    const bDone = isDoneToday(b);
+    if (aDone !== bDone) return aDone ? 1 : -1;
+    return new Date(a.next_due_at).getTime() - new Date(b.next_due_at).getTime();
+  });
 }
 
 function formatTime(iso: string): string {
@@ -50,20 +53,55 @@ function formatTime(iso: string): string {
 }
 
 export default function CareScreen() {
-  const [activeTab, setActiveTab] = useState<Tab>('today');
   const [deleteMode, setDeleteMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const { pets } = usePetStore();
-  const { schedules, loading, fetchSchedules, markDone, markUndone, deleteSchedule } = useCareStore();
+  const { schedules, loading, fetchSchedules, markDone, markUndone, deleteSchedule, careStreak } = useCareStore();
   const pet = pets[0] ?? null;
+
+  const bannerAnim = useRef(new Animated.Value(0)).current;
+  const prevAllDone = useRef(true);
+
+  const todayStr = localDateStr();
+
+  const todayItems = schedules.filter(s =>
+    s.frequency === 'daily' ||
+    localDateStr(new Date(s.next_due_at)) <= todayStr ||
+    (s.last_done_at !== null && localDateStr(new Date(s.last_done_at)) === todayStr),
+  );
+  const allTodayDone = todayItems.length > 0 && todayItems.every(isDoneToday);
+  const doneCount = todayItems.filter(isDoneToday).length;
+  const todaySorted = sortCareItems(todayItems);
+
+  const sevenDaysLater = new Date();
+  sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
+  const sevenDaysStr = localDateStr(sevenDaysLater);
+
+  const upcomingItems = schedules
+    .filter(s => {
+      if (s.frequency === 'daily') return false;
+      const due = localDateStr(new Date(s.next_due_at));
+      return due > todayStr && due <= sevenDaysStr;
+    })
+    .sort((a, b) => new Date(a.next_due_at).getTime() - new Date(b.next_due_at).getTime());
+
+  useEffect(() => {
+    if (!prevAllDone.current && allTodayDone) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      bannerAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(bannerAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(2500),
+        Animated.timing(bannerAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+    prevAllDone.current = allTodayDone;
+  }, [allTodayDone]);
 
   useEffect(() => {
     if (pet) fetchSchedules(pet.id);
   }, [pet?.id]);
-
-  const filtered = filterByTab(schedules, activeTab);
-  const doneCount = filtered.filter(isDoneToday).length;
 
   function enterDeleteMode() {
     setDeleteMode(true);
@@ -103,7 +141,7 @@ export default function CareScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       {/* 헤더 */}
       <View style={styles.header}>
         <View style={styles.titleRow}>
@@ -113,20 +151,10 @@ export default function CareScreen() {
               <Text style={styles.headerBtnText}>완료</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={enterDeleteMode} style={styles.headerBtn}>
-              <Text style={styles.trashIcon}>🗑️</Text>
+            <TouchableOpacity onPress={enterDeleteMode} style={styles.deleteBtn}>
+              <Text style={styles.deleteBtnText}>삭제</Text>
             </TouchableOpacity>
           )}
-        </View>
-        <View style={styles.tabRow}>
-          {TABS.map(tab => (
-            <TouchableOpacity key={tab.id} style={styles.tabBtn} onPress={() => setActiveTab(tab.id)}>
-              <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>
-                {tab.label}
-              </Text>
-              <View style={[styles.tabUnderline, activeTab === tab.id && styles.tabUnderlineActive]} />
-            </TouchableOpacity>
-          ))}
         </View>
       </View>
 
@@ -139,72 +167,112 @@ export default function CareScreen() {
         ) : (
           <View style={styles.counterPill}>
             <Text style={styles.counterText}>✅ {doneCount}개 완료</Text>
-            <Text style={styles.counterSub}> / 총 {filtered.length}개</Text>
+            <Text style={styles.counterSub}> / 총 {todayItems.length}개</Text>
           </View>
         )}
       </View>
 
-      {/* 목록 */}
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={Colors.primary} size="large" />
         </View>
-      ) : filtered.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 }}>
-          <Text style={{ fontSize: 40, marginBottom: 12 }}>🐾</Text>
-          <Text style={{ fontSize: 15, color: Colors.sub, fontWeight: '600' }}>
-            {pet ? '케어 일정을 추가해보세요' : '반려동물을 먼저 등록해주세요'}
-          </Text>
-        </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          {filtered.map(item => {
-            const done = isDoneToday(item);
-            const meta = CARE_TYPE_META[item.type];
-            const isSelected = selected.has(item.id);
 
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.itemCard,
-                  done && !deleteMode && styles.itemCardDone,
-                  isSelected && styles.itemCardSelected,
-                ]}
-                onPress={() => deleteMode ? toggleSelect(item.id) : toggle(item)}
-                onLongPress={() => !deleteMode && router.push({ pathname: '/care-add', params: { id: item.id } })}
-                delayLongPress={400}
-                activeOpacity={0.75}
-              >
-                {/* 삭제 모드: 체크박스 */}
-                {deleteMode && (
-                  <View style={[styles.deleteCheckbox, isSelected && styles.deleteCheckboxSelected]}>
-                    {isSelected && <Text style={styles.deleteCheckMark}>✓</Text>}
-                  </View>
-                )}
+          {/* 섹션 1: 오늘 케어 */}
+          <Text style={styles.sectionHeader}>오늘 케어</Text>
 
-                <View style={[styles.itemIcon, done && !deleteMode && styles.itemIconDone]}>
-                  <Image source={CARE_TYPE_IMAGES[item.type]} style={{ width: 28, height: 28 }} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.itemLabel, done && !deleteMode && styles.itemLabelDone]}>
-                    {item.label}
-                  </Text>
-                  <Text style={styles.itemTime}>{formatTime(item.next_due_at)}</Text>
-                  {item.notes && !done && (
-                    <Text style={styles.itemNotes} numberOfLines={1}>{item.notes}</Text>
+          {todaySorted.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Text style={styles.emptyIcon}>🐾</Text>
+              <Text style={styles.emptyText}>
+                {pet ? '케어 일정을 추가해보세요' : '반려동물을 먼저 등록해주세요'}
+              </Text>
+            </View>
+          ) : (
+            todaySorted.map(item => {
+              const done = isDoneToday(item);
+              const isSelected = selected.has(item.id);
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.itemCard,
+                    done && !deleteMode && styles.itemCardDone,
+                    isSelected && styles.itemCardSelected,
+                  ]}
+                  onPress={() => deleteMode ? toggleSelect(item.id) : toggle(item)}
+                  onLongPress={() => !deleteMode && router.push({ pathname: '/care-add', params: { id: item.id } })}
+                  delayLongPress={400}
+                  activeOpacity={0.75}
+                >
+                  {deleteMode && (
+                    <View style={[styles.deleteCheckbox, isSelected && styles.deleteCheckboxSelected]}>
+                      {isSelected && <Text style={styles.deleteCheckMark}>✓</Text>}
+                    </View>
                   )}
-                </View>
-
-                {/* 일반 모드: 완료 체크서클 */}
-                {!deleteMode && (
-                  <View style={[styles.checkCircle, done && styles.checkCircleDone]}>
-                    {done && <Text style={styles.checkMark}>✓</Text>}
+                  <View style={[styles.itemIcon, done && !deleteMode && styles.itemIconDone]}>
+                    <Image source={CARE_TYPE_IMAGES[item.type]} style={{ width: 28, height: 28 }} />
                   </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.itemLabel, done && !deleteMode && styles.itemLabelDone]}>
+                      {item.label}
+                    </Text>
+                    <Text style={styles.itemTime}>{formatTime(item.next_due_at)}</Text>
+                    {item.notes && !done && (
+                      <Text style={styles.itemNotes} numberOfLines={1}>{item.notes}</Text>
+                    )}
+                  </View>
+                  {!deleteMode && (
+                    <View style={[styles.checkCircle, done && styles.checkCircleDone]}>
+                      {done && <Text style={styles.checkMark}>✓</Text>}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+
+          {/* 섹션 2: 다가오는 일정 */}
+          {upcomingItems.length > 0 && (
+            <>
+              <Text style={styles.sectionHeader}>다가오는 일정</Text>
+              {upcomingItems.map(item => {
+                const isSelected = selected.has(item.id);
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.itemCard,
+                      styles.itemCardUpcoming,
+                      isSelected && styles.itemCardSelected,
+                    ]}
+                    onPress={() => { if (deleteMode) toggleSelect(item.id); }}
+                    onLongPress={() => !deleteMode && router.push({ pathname: '/care-add', params: { id: item.id } })}
+                    delayLongPress={400}
+                    activeOpacity={deleteMode ? 0.75 : 1}
+                  >
+                    {deleteMode && (
+                      <View style={[styles.deleteCheckbox, isSelected && styles.deleteCheckboxSelected]}>
+                        {isSelected && <Text style={styles.deleteCheckMark}>✓</Text>}
+                      </View>
+                    )}
+                    <View style={styles.itemIcon}>
+                      <Image source={CARE_TYPE_IMAGES[item.type]} style={{ width: 28, height: 28 }} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemLabel}>{item.label}</Text>
+                      <Text style={styles.itemTime}>{formatUpcomingDate(item.next_due_at)}</Text>
+                      {item.notes && (
+                        <Text style={styles.itemNotes} numberOfLines={1}>{item.notes}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </>
+          )}
+
           <View style={{ height: deleteMode ? 120 : 100 }} />
         </ScrollView>
       )}
@@ -224,9 +292,31 @@ export default function CareScreen() {
         </View>
       )}
 
-      {/* 일반 모드: FAB */}
+      {/* 완료 배너 */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.completionBanner,
+          {
+            opacity: bannerAnim,
+            transform: [{ translateY: bannerAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+          },
+        ]}
+      >
+        <Text style={styles.completionBannerText}>
+          오늘 {pet?.name ?? '반려동물'} 케어 완료! 🎉 연속 {careStreak}일째
+        </Text>
+      </Animated.View>
+
+      {/* FAB */}
       {!deleteMode && (
-        <TouchableOpacity style={styles.fab} onPress={() => router.push('/care-add')}>
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => {
+            if (!pet) { Alert.alert('반려동물 등록 필요', '케어를 추가하려면 반려동물을 먼저 등록해주세요.'); return; }
+            router.push('/care-add');
+          }}
+        >
           <Text style={styles.fabPlus}>+</Text>
         </TouchableOpacity>
       )}
@@ -240,23 +330,20 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: Colors.white,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
-    paddingTop: 16, paddingHorizontal: 20,
+    paddingTop: 16, paddingHorizontal: 20, paddingBottom: 16,
   },
   titleRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: 14,
   },
   title: { fontSize: 20, fontWeight: '800', color: Colors.text },
   headerBtn: { padding: 4 },
   headerBtnText: { fontSize: 15, fontWeight: '700', color: Colors.primary },
-  trashIcon: { fontSize: 20 },
-
-  tabRow: { flexDirection: 'row' },
-  tabBtn: { flex: 1, alignItems: 'center' },
-  tabLabel: { fontSize: 14, fontWeight: '700', color: Colors.sub, paddingVertical: 10 },
-  tabLabelActive: { color: Colors.primary },
-  tabUnderline: { height: 2.5, width: '100%', backgroundColor: 'transparent' },
-  tabUnderlineActive: { backgroundColor: Colors.primary },
+  deleteBtn: {
+    backgroundColor: Colors.danger,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 14, paddingVertical: 6,
+  },
+  deleteBtnText: { fontSize: 13, fontWeight: '700', color: Colors.white },
 
   counterRow: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6, minHeight: 38 },
   counterPill: {
@@ -270,7 +357,19 @@ const styles = StyleSheet.create({
   counterSub: { fontSize: 13, color: Colors.sub },
   deleteModeHint: { fontSize: 13, fontWeight: '700', color: Colors.danger, paddingVertical: 6 },
 
-  content: { paddingHorizontal: 20, paddingTop: 6, gap: 10 },
+  content: { paddingHorizontal: 20, paddingTop: 4, gap: 10 },
+
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.sub,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+
+  emptyBox: { alignItems: 'center', paddingVertical: 32 },
+  emptyIcon: { fontSize: 36, marginBottom: 8 },
+  emptyText: { fontSize: 15, color: Colors.sub, fontWeight: '600' },
 
   itemCard: {
     backgroundColor: Colors.white,
@@ -283,6 +382,7 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   itemCardDone: { opacity: 0.55, borderColor: Colors.border },
+  itemCardUpcoming: { opacity: 0.6 },
   itemCardSelected: { borderColor: Colors.danger, backgroundColor: '#FFF5F5' },
 
   deleteCheckbox: {
@@ -339,4 +439,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
   },
   fabPlus: { color: Colors.white, fontSize: 28, fontWeight: '300', lineHeight: 32 },
+
+  completionBanner: {
+    position: 'absolute', bottom: 160,
+    alignSelf: 'center',
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 20, paddingVertical: 12,
+    ...Shadow.card,
+    shadowColor: Colors.accent,
+    shadowOpacity: 0.35,
+  },
+  completionBannerText: { color: Colors.white, fontSize: 14, fontWeight: '700' },
 });

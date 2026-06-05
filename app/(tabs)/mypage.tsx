@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Modal, TextInput, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Modal, TextInput, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -9,10 +10,9 @@ import { supabase } from '@/lib/supabase';
 import { usePetStore, SPECIES_EMOJI, formatAge } from '@/stores/pet.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useFamilyStore } from '@/stores/family.store';
-import { useSubscriptionStore } from '@/stores/subscription.store';
 
 const STATIC_MENU = [
-  { emoji: '📊', label: '월간 건강 리포트', sub: '프리미엄 기능' },
+  { emoji: '📊', label: '월간 건강 리포트', sub: '' },
   { emoji: '🏥', label: '동물병원 즐겨찾기', sub: '저장된 병원 0곳' },
   { emoji: '⚙️', label: '앱 설정', sub: '' },
 ];
@@ -21,8 +21,13 @@ export default function MyPageScreen() {
   const { pets, loading, fetchPets, deletePet, updatePetPhoto, updatePet } = usePetStore();
   const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
   const { loadSettings } = useSettingsStore();
-  const { family, members, myUserId, loading: familyLoading, fetchFamily, createFamily, joinFamily, leaveFamily, removeMember, dissolveFamily } = useFamilyStore();
-  const { isPremium, fetchStatus } = useSubscriptionStore();
+  const {
+    family, members, pendingRequests, myPendingRequest, myUserId,
+    loading: familyLoading,
+    fetchFamily, createFamily, requestJoin, cancelMyRequest,
+    approveRequest, rejectRequest,
+    leaveFamily, removeMember, dissolveFamily,
+  } = useFamilyStore();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
@@ -40,7 +45,6 @@ export default function MyPageScreen() {
     fetchPets();
     loadSettings();
     fetchFamily();
-    fetchStatus();
     supabase.auth.getSession().then(({ data }) => {
       setUserEmail(data.session?.user?.email ?? null);
       setDisplayName(data.session?.user?.user_metadata?.display_name ?? null);
@@ -63,20 +67,40 @@ export default function MyPageScreen() {
   async function handleJoinFamily() {
     if (!codeInput.trim()) return;
     setFamilyActionLoading(true);
-    const result = await joinFamily(codeInput.trim());
+    const result = await requestJoin(codeInput.trim());
     setFamilyActionLoading(false);
-    if (result === 'success') {
+    if (result === 'pending') {
       setJoinModalVisible(false);
       setCodeInput('');
     } else {
       const msg: Record<string, string> = {
         not_found: '초대 코드를 찾을 수 없어요.',
-        full: '패밀리 인원이 가득 찼어요. (최대 4명)',
         already_member: '이미 패밀리에 속해 있어요.',
         error: '오류가 발생했어요. 다시 시도해주세요.',
       };
       Alert.alert('참여 실패', msg[result] ?? '오류가 발생했어요.');
     }
+  }
+
+  async function handleApproveRequest(request: import('@/stores/family.store').JoinRequest) {
+    const result = await approveRequest(request);
+    if (result === 'full') {
+      Alert.alert('인원 초과', '패밀리 인원이 가득 찼어요. (최대 4명)');
+    }
+  }
+
+  function handleRejectRequest(requestId: string, name: string) {
+    Alert.alert('신청 거절', `${name}의 참여 신청을 거절할까요?`, [
+      { text: '취소', style: 'cancel' },
+      { text: '거절', style: 'destructive', onPress: () => rejectRequest(requestId) },
+    ]);
+  }
+
+  function handleCancelMyRequest() {
+    Alert.alert('신청 취소', '참여 신청을 취소할까요?', [
+      { text: '아니요', style: 'cancel' },
+      { text: '취소하기', style: 'destructive', onPress: cancelMyRequest },
+    ]);
   }
 
   function handleLeaveOrDissolve() {
@@ -226,7 +250,7 @@ export default function MyPageScreen() {
     : pets[0] ? `${pets[0].name} 보호자님` : '보호자님';
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       {/* 프로필 헤더 */}
       <View style={styles.profileHeader}>
         <View style={styles.profileCircleBg} />
@@ -245,17 +269,6 @@ export default function MyPageScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 프리미엄 상태 */}
-        {isPremium ? (
-          <View style={styles.premiumBadgeRow}>
-            <Text style={styles.premiumBadgeTxt}>✨ 프리미엄 구독 중</Text>
-          </View>
-        ) : (
-          <TouchableOpacity style={styles.upgradeBanner} onPress={() => router.push('/paywall' as any)}>
-            <Text style={styles.upgradeTxt}>✨ 프리미엄으로 업그레이드</Text>
-            <Text style={styles.upgradeChevron}>›</Text>
-          </TouchableOpacity>
-        )}
 
         {/* 반려동물 */}
         <Text style={styles.sectionTitle}>나의 반려동물</Text>
@@ -318,18 +331,10 @@ export default function MyPageScreen() {
         {/* 반려동물 추가 */}
         <TouchableOpacity
           style={styles.addPetBtn}
-          onPress={() => {
-            if (!isPremium && pets.length >= 1) {
-              router.push('/paywall' as any);
-            } else {
-              router.push('/(onboarding)/register-pet');
-            }
-          }}
+          onPress={() => router.push('/(onboarding)/register-pet')}
         >
           <Text style={styles.addPetPlus}>+</Text>
-          <Text style={styles.addPetLabel}>
-            {!isPremium && pets.length >= 1 ? '반려동물 추가 (프리미엄)' : '반려동물 추가하기'}
-          </Text>
+          <Text style={styles.addPetLabel}>반려동물 추가하기</Text>
         </TouchableOpacity>
 
         {/* 패밀리 그룹 */}
@@ -365,6 +370,30 @@ export default function MyPageScreen() {
               </View>
             ))}
 
+            {/* 참여 신청 목록 (방장 전용) */}
+            {family.owner_id === myUserId && pendingRequests.length > 0 && (
+              <View style={styles.pendingSection}>
+                <Text style={styles.pendingTitle}>참여 신청 {pendingRequests.length}건</Text>
+                {pendingRequests.map(req => (
+                  <View key={req.id} style={styles.pendingRow}>
+                    <View style={styles.memberAvatar}>
+                      <Text style={{ fontSize: 16 }}>🙋</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.memberEmail}>{req.display_name || req.email}</Text>
+                      <Text style={styles.memberRole}>{req.email}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.approveBtn} onPress={() => handleApproveRequest(req)}>
+                      <Text style={styles.approveTxt}>승인</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.rejectBtn} onPress={() => handleRejectRequest(req.id, req.display_name || req.email)}>
+                      <Text style={styles.rejectTxt}>거절</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+
             {/* 초대 코드 */}
             <View style={styles.inviteBox}>
               <View style={{ flex: 1 }}>
@@ -381,6 +410,15 @@ export default function MyPageScreen() {
               <Text style={styles.leaveTxt}>
                 {family.owner_id === myUserId ? '패밀리 해산' : '패밀리 탈퇴'}
               </Text>
+            </TouchableOpacity>
+          </View>
+        ) : myPendingRequest ? (
+          <View style={styles.pendingCard}>
+            <Text style={styles.pendingCardEmoji}>⏳</Text>
+            <Text style={styles.pendingCardTitle}>승인 대기 중이에요</Text>
+            <Text style={styles.pendingCardDesc}>그룹장이 승인하면 패밀리에 합류돼요</Text>
+            <TouchableOpacity style={styles.cancelRequestBtn} onPress={handleCancelMyRequest}>
+              <Text style={styles.cancelRequestTxt}>신청 취소</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -714,6 +752,43 @@ const styles = StyleSheet.create({
     fontSize: 15, color: Colors.text,
     marginTop: 4,
   },
+
+  // 참여 신청 목록 (방장용)
+  pendingSection: {
+    borderTopWidth: 1, borderTopColor: Colors.border,
+    paddingTop: 10, gap: 8,
+  },
+  pendingTitle: { fontSize: 13, fontWeight: '700', color: Colors.sub },
+  pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  approveBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.icon,
+    paddingHorizontal: 10, paddingVertical: 5,
+  },
+  approveTxt: { fontSize: 12, fontWeight: '700', color: Colors.white },
+  rejectBtn: {
+    backgroundColor: Colors.bg,
+    borderRadius: Radius.icon,
+    paddingHorizontal: 10, paddingVertical: 5,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  rejectTxt: { fontSize: 12, fontWeight: '600', color: Colors.sub },
+
+  // 승인 대기 중 카드 (신청자용)
+  pendingCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.card,
+    padding: 24,
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1.5, borderColor: Colors.primary,
+    ...Shadow.sm,
+  },
+  pendingCardEmoji: { fontSize: 32 },
+  pendingCardTitle: { fontSize: 16, fontWeight: '800', color: Colors.text },
+  pendingCardDesc: { fontSize: 13, color: Colors.sub, textAlign: 'center' },
+  cancelRequestBtn: { marginTop: 8, paddingVertical: 4 },
+  cancelRequestTxt: { fontSize: 13, color: Colors.danger, fontWeight: '600' },
 
   premiumBadgeRow: {
     backgroundColor: Colors.primaryLight,
