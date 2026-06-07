@@ -99,17 +99,6 @@ export default function HomeScreen() {
       : null;
   }, [logs]);
 
-  // 생일 D-7 배너용
-  const birthdayDaysLeft = useMemo(() => {
-    if (!pet?.birthday) return null;
-    const bday = new Date(pet.birthday);
-    const now = new Date();
-    const thisYear = new Date(now.getFullYear(), bday.getMonth(), bday.getDate());
-    if (thisYear < now) thisYear.setFullYear(now.getFullYear() + 1);
-    const days = Math.ceil((thisYear.getTime() - now.getTime()) / 86400000);
-    return days <= 7 ? days : null;
-  }, [pet?.birthday]);
-
   // 가장 가까운 비반복 미완료 일정 (D-X 배너용)
   const nextCare = useMemo(() => {
     return schedules
@@ -283,38 +272,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
-        {/* 스마트 추천 배너 */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>스마트 추천</Text>
-          </View>
-          <TouchableOpacity
-            style={styles.recommendBanner}
-            onPress={() => router.push('/recommend')}
-            activeOpacity={0.85}
-          >
-            <View style={styles.recommendLeft}>
-              <Text style={styles.recommendEmoji}>
-                {birthdayDaysLeft !== null ? '🎂' : '🛒'}
-              </Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              {birthdayDaysLeft !== null ? (
-                <>
-                  <View style={styles.recommendBadge}>
-                    <Text style={styles.recommendBadgeText}>D-{birthdayDaysLeft}</Text>
-                  </View>
-                  <Text style={styles.recommendTitle}>{pet?.name} 생일 선물 추천</Text>
-                </>
-              ) : (
-                <Text style={styles.recommendTitle}>{pet?.name ?? '반려동물'} 맞춤 추천 보기</Text>
-              )}
-              <Text style={styles.recommendSub}>사료·용품·입양 정보를 한눈에</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* 다가오는 일정 */}
         {upcomingItems.length > 0 && (
           <View style={styles.section}>
@@ -325,7 +282,12 @@ export default function HomeScreen() {
               const isUrgent = daysUntil === '오늘' || daysUntil === '내일' ||
                 (daysUntil.includes('일 후') && parseInt(daysUntil) <= 3);
               return (
-                <View key={item.id} style={[styles.card, styles.upcomingRow, { marginBottom: 10 }]}>
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.card, styles.upcomingRow, { marginBottom: 10 }]}
+                  onPress={() => router.push({ pathname: '/care-add', params: { id: item.id } })}
+                  activeOpacity={0.75}
+                >
                   <View style={[styles.upcomingIcon, { backgroundColor: isUrgent ? '#FFF0F0' : Colors.accentLight }]}>
                     <Image source={CARE_TYPE_IMAGES[item.type]} style={styles.careIconImg} />
                   </View>
@@ -336,7 +298,7 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                   <Text style={styles.chevron}>›</Text>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -467,35 +429,6 @@ const styles = StyleSheet.create({
   },
   checkCircleDone: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   checkMark: { color: Colors.white, fontSize: 12, fontWeight: '700' },
-
-  recommendBanner: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.card,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    ...Shadow.card,
-    marginBottom: 16,
-  },
-  recommendLeft: {
-    width: 44, height: 44, borderRadius: Radius.icon,
-    backgroundColor: Colors.primaryLight,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  recommendEmoji: { fontSize: 22 },
-  recommendBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.danger,
-    borderRadius: Radius.pill,
-    paddingHorizontal: 8, paddingVertical: 2,
-    marginBottom: 4,
-  },
-  recommendBadgeText: { color: Colors.white, fontSize: 11, fontWeight: '800' },
-  recommendTitle: { fontSize: 14, fontWeight: '700', color: Colors.text },
-  recommendSub: { fontSize: 12, color: Colors.sub, marginTop: 2 },
 
   upcomingRow: {
     flexDirection: 'row', alignItems: 'center',

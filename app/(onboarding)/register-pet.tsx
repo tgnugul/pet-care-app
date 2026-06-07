@@ -20,15 +20,6 @@ function base64ToBytes(base64: string): Uint8Array {
 type Species = 'dog' | 'cat' | 'rabbit' | 'bird' | 'fish' | 'other';
 type Gender = 'male' | 'female' | null;
 
-const SPECIES_OPTIONS: { value: Species; label: string; emoji: string }[] = [
-  { value: 'dog', label: '강아지', emoji: '🐶' },
-  { value: 'cat', label: '고양이', emoji: '🐱' },
-  { value: 'rabbit', label: '토끼', emoji: '🐰' },
-  { value: 'bird', label: '새', emoji: '🐦' },
-  { value: 'fish', label: '물고기', emoji: '🐟' },
-  { value: 'other', label: '기타', emoji: '🐾' },
-];
-
 export default function RegisterPetScreen() {
   const [name, setName] = useState('');
   const [species, setSpecies] = useState<Species>('dog');
@@ -156,29 +147,23 @@ export default function RegisterPetScreen() {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* 프로필 사진 */}
-        <TouchableOpacity style={styles.photoPickerWrap} onPress={pickPhoto} activeOpacity={0.8}>
-          {profilePhotoUri ? (
-            <Image source={{ uri: profilePhotoUri }} style={styles.photoPreview} />
-          ) : (
-            <Image source={require('@/assets/images/camera-add.png')} style={styles.photoPreview} />
-          )}
-        </TouchableOpacity>
-
-        {/* 종류 */}
-        <Text style={styles.label}>종류 *</Text>
-        <View style={styles.speciesRow}>
-          {SPECIES_OPTIONS.map(opt => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.speciesBtn, species === opt.value && styles.speciesBtnActive]}
-              onPress={() => setSpecies(opt.value)}
-            >
-              <Text style={styles.speciesEmoji}>{opt.emoji}</Text>
-              <Text style={[styles.speciesLabel, species === opt.value && styles.speciesLabelActive]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.photoSection}>
+          <TouchableOpacity style={styles.photoPickerWrap} onPress={pickPhoto} activeOpacity={0.8}>
+            {profilePhotoUri ? (
+              <>
+                <Image source={{ uri: profilePhotoUri }} style={styles.photoPreview} />
+                <View style={styles.photoEditBadge}>
+                  <Text style={styles.photoEditBadgeText}>수정</Text>
+                </View>
+              </>
+            ) : (
+              <View style={styles.photoEmpty}>
+                <Image source={require('@/assets/images/camera-add.png')} style={styles.cameraIcon} />
+                <Text style={styles.photoEmptyText}>사진 추가</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.photoHint}>반려동물 프로필 사진 (선택)</Text>
         </View>
 
         {/* 이름 */}
@@ -289,25 +274,30 @@ const styles = StyleSheet.create({
 
   content: { padding: 20, gap: 8 },
 
-  photoPickerWrap: { alignSelf: 'center', marginTop: 8, marginBottom: 4 },
-  photoPreview: { width: 96, height: 96, borderRadius: 48 },
+  photoSection: { alignItems: 'center', marginTop: 8, marginBottom: 4 },
+  photoPickerWrap: { position: 'relative' },
+  photoPreview: { width: 100, height: 100, borderRadius: 50 },
+  photoEmpty: {
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: Colors.primaryLight,
+    borderWidth: 2, borderColor: Colors.primary,
+    borderStyle: 'dashed',
+    alignItems: 'center', justifyContent: 'center',
+    gap: 4,
+  },
+  cameraIcon: { width: 30, height: 30 },
+  photoEmptyText: { fontSize: 11, fontWeight: '700', color: Colors.primary },
+  photoEditBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    backgroundColor: Colors.primary,
+    borderRadius: 14, paddingHorizontal: 8, paddingVertical: 4,
+    borderWidth: 2, borderColor: Colors.white,
+  },
+  photoEditBadgeText: { color: Colors.white, fontSize: 10, fontWeight: '800' },
+  photoHint: { fontSize: 12, color: Colors.sub, marginTop: 10 },
 
   label: { fontSize: 13, fontWeight: '700', color: Colors.sub, marginTop: 8 },
   optional: { fontWeight: '400', color: Colors.light },
-
-  speciesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  speciesBtn: {
-    borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: Radius.button,
-    paddingVertical: 10, paddingHorizontal: 14,
-    alignItems: 'center', gap: 4,
-    backgroundColor: Colors.white,
-    minWidth: 72,
-  },
-  speciesBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  speciesEmoji: { fontSize: 22 },
-  speciesLabel: { fontSize: 12, fontWeight: '600', color: Colors.sub },
-  speciesLabelActive: { color: Colors.primary },
 
   input: {
     borderWidth: 1.5, borderColor: Colors.border,

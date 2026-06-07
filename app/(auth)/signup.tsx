@@ -1,95 +1,153 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
-  ScrollView,
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
-import { Colors, Radius, Shadow } from '@/constants/design';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 WebBrowser.maybeCompleteAuthSession();
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function getPasswordStrength(pw: string): { level: 0 | 1 | 2 | 3; label: string; color: string } {
-  if (!pw) return { level: 0, label: '', color: Colors.border };
-  const hasNum = /\d/.test(pw);
-  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pw);
-  if (pw.length >= 10 && hasNum && hasSpecial) return { level: 3, label: '강함', color: '#22c55e' };
-  if (pw.length >= 8 && (hasNum || hasSpecial)) return { level: 2, label: '보통', color: '#f59e0b' };
-  return { level: 1, label: '약함', color: '#ef4444' };
+const LIGHT = {
+  brand: '#FF8A47',
+  brandPress: '#F2742E',
+  brandTint: '#FFF4EC',
+  bg: '#FFFFFF',
+  ink: '#2C2622',
+  ink2: '#7A7068',
+  ink3: '#ACA298',
+  line: '#EFE7DE',
+  field: '#F7F0E8',
+  fieldLine: '#E7DCD0',
+  kakao: '#FEE500',
+  kakaoInk: '#3B1E1E',
+  danger: '#EF4444',
+};
+
+const DARK = {
+  brand: '#FF8A47',
+  brandPress: '#F2742E',
+  brandTint: '#2D1A0A',
+  bg: '#1C1714',
+  ink: '#F0E8E0',
+  ink2: '#A89B8E',
+  ink3: '#5E524A',
+  line: '#2E2822',
+  field: '#252019',
+  fieldLine: '#3A3028',
+  kakao: '#FEE500',
+  kakaoInk: '#3B1E1E',
+  danger: '#FF6B6B',
+};
+
+function makeStyles(C: typeof LIGHT) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: C.bg },
+
+    topBar: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      height: 52, paddingHorizontal: 8,
+      borderBottomWidth: 1, borderBottomColor: C.line,
+    },
+    backBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, padding: 8 },
+    backText: { fontSize: 15, fontWeight: '600', color: C.ink2 },
+    topTitle: { fontSize: 16, fontWeight: '700', color: C.ink },
+
+    content: { paddingHorizontal: 26, paddingBottom: 48 },
+    titleSection: { marginTop: 18, marginBottom: 24, marginHorizontal: 2 },
+    title: { fontSize: 21, fontWeight: '800', color: C.ink, letterSpacing: -0.4 },
+    titleSub: { fontSize: 13, color: C.ink2, fontWeight: '500', marginTop: 8, lineHeight: 20 },
+
+    fields: { gap: 12 },
+    field: {
+      height: 54, backgroundColor: C.field, borderRadius: 16,
+      paddingHorizontal: 16, fontSize: 15, fontWeight: '500', color: C.ink,
+      borderWidth: 1.5, borderColor: 'transparent',
+    },
+    fieldFocus: { backgroundColor: C.bg, borderColor: C.brand },
+    fieldErr: { borderColor: C.danger },
+    errText: { fontSize: 12, color: C.danger, marginTop: 5, marginLeft: 4 },
+    pwWrap: { position: 'relative' },
+    pwInput: { paddingRight: 48 },
+    eyeBtn: { position: 'absolute', right: 16, top: 0, bottom: 0, justifyContent: 'center' },
+
+    agreeRow: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: 9,
+      marginTop: 18, marginBottom: 22, marginHorizontal: 2,
+    },
+    chk: {
+      width: 20, height: 20, borderRadius: 7, marginTop: 1,
+      backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center',
+    },
+    chkOff: { backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.fieldLine },
+    agreeText: { flex: 1, fontSize: 13.5, color: C.ink2, fontWeight: '500', lineHeight: 22 },
+    required: { color: C.brandPress, fontWeight: '700' },
+
+    btnPrimary: {
+      height: 54, borderRadius: 16, backgroundColor: C.brand,
+      alignItems: 'center', justifyContent: 'center',
+      shadowColor: C.brandPress, shadowOpacity: 0.65, shadowRadius: 22,
+      shadowOffset: { width: 0, height: 10 }, elevation: 8,
+    },
+    btnText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+
+    linkRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 16 },
+    linkLabel: { fontSize: 14, color: C.ink2 },
+    link: { fontSize: 14, fontWeight: '700', color: C.brandPress },
+
+    divider: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      marginTop: 26, marginBottom: 18, marginHorizontal: 4,
+    },
+    divLine: { flex: 1, height: 1, backgroundColor: C.line },
+    divText: { fontSize: 13, color: C.ink3, fontWeight: '500' },
+
+    socials: { flexDirection: 'row', justifyContent: 'center', gap: 18 },
+    socialCircle: {
+      width: 54, height: 54, borderRadius: 27,
+      backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    kakaoCircle: { backgroundColor: C.kakao, borderColor: C.kakao },
+    googleG: { fontSize: 20, fontWeight: '800', color: '#4285F4' },
+    kakaoIcon: { fontSize: 22 },
+  });
 }
 
+const sLight = makeStyles(LIGHT);
+const sDark = makeStyles(DARK);
+
 export default function SignupScreen() {
+  const isDark = useColorScheme() === 'dark';
+  const C = isDark ? DARK : LIGHT;
+  const s = isDark ? sDark : sLight;
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState<'google' | 'kakao' | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [focused, setFocused] = useState<string | null>(null);
 
   const emailValid = email ? EMAIL_REGEX.test(email) : null;
-  const strength = getPasswordStrength(password);
-  const passwordMatch = confirmPassword ? password === confirmPassword : null;
-
-  async function handleSocialLogin(provider: 'google' | 'kakao') {
-    setSocialLoading(provider);
-    const redirectTo = Linking.createURL('');
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo,
-        skipBrowserRedirect: true,
-        ...(provider === 'google' && { queryParams: { prompt: 'select_account' } }),
-      },
-    });
-    if (error || !data.url) {
-      setSocialLoading(null);
-      Alert.alert('오류', '가입을 시작할 수 없어요. 잠시 후 다시 시도해주세요.');
-      return;
-    }
-
-    if (provider === 'kakao') {
-      setSocialLoading(null);
-      await WebBrowser.openBrowserAsync(data.url);
-      return;
-    }
-
-    await WebBrowser.openAuthSessionAsync(data.url, redirectTo, { preferEphemeralSession: true });
-    setSocialLoading(null);
-  }
+  const pwMatch = confirmPw ? password === confirmPw : null;
+  const ready = EMAIL_REGEX.test(email) && password.length >= 8 && password === confirmPw && agree;
 
   async function handleSignup() {
-    if (!EMAIL_REGEX.test(email.trim())) {
-      Alert.alert('이메일 오류', '올바른 이메일 형식을 입력해주세요.');
-      return;
-    }
-    if (strength.level < 1) {
-      Alert.alert('비밀번호 오류', '비밀번호를 입력해주세요.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      Alert.alert('비밀번호 불일치', '비밀번호를 다시 확인해주세요.');
-      return;
-    }
-    if (!agreedTerms) {
-      Alert.alert('약관 동의 필요', '서비스 이용을 위해 약관에 동의해주세요.');
-      return;
-    }
-
+    if (!ready) return;
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    });
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
     setLoading(false);
-
     if (error) {
       Alert.alert('회원가입 실패', error.message);
     } else if (!data.session) {
@@ -103,249 +161,154 @@ export default function SignupScreen() {
     }
   }
 
-  const ready = EMAIL_REGEX.test(email) && password && password === confirmPassword && agreedTerms && !loading;
+  async function handleSocialLogin(provider: 'google' | 'kakao') {
+    setSocialLoading(provider);
+    const redirectTo = Linking.createURL('');
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo, skipBrowserRedirect: true,
+        ...(provider === 'google' && { queryParams: { prompt: 'select_account' } }) },
+    });
+    if (error || !data.url) { setSocialLoading(null); Alert.alert('오류', '잠시 후 다시 시도해주세요.'); return; }
+    if (provider === 'kakao') { setSocialLoading(null); await WebBrowser.openBrowserAsync(data.url); return; }
+    await WebBrowser.openAuthSessionAsync(data.url, redirectTo, { preferEphemeralSession: true });
+    setSocialLoading(null);
+  }
+
+  const f = (name: string) => [
+    s.field,
+    focused === name && s.fieldFocus,
+    focused !== name && name === 'email' && emailValid === false && s.fieldErr,
+    name === 'confirm' && pwMatch === false && s.fieldErr,
+  ];
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.kav}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backTxt}>‹ 뒤로</Text>
-          </TouchableOpacity>
-          <Text style={styles.logo}>🐾 뽀시래기</Text>
-          <Text style={styles.tagline}>반려동물과 함께하는 모든 순간</Text>
-        </View>
+    <SafeAreaView style={s.safe}>
+      <View style={s.topBar}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={22} color={C.ink2} />
+          <Text style={s.backText}>뒤로</Text>
+        </TouchableOpacity>
+        <Text style={s.topTitle}>회원가입</Text>
+        <View style={{ width: 64 }} />
+      </View>
 
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.form} keyboardShouldPersistTaps="handled">
-          <Text style={styles.formTitle}>회원가입</Text>
-
-          {/* 이메일 */}
-          <View>
-            <TextInput
-              style={[styles.input, emailValid === false && styles.inputError]}
-              placeholder="이메일"
-              placeholderTextColor={Colors.light}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {emailValid === false && (
-              <Text style={styles.errorText}>올바른 이메일 형식을 입력해주세요.</Text>
-            )}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={s.content}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={s.titleSection}>
+            <Text style={s.title}>계정 만들기</Text>
+            <Text style={s.titleSub}>가입하고 우리 아이 순간을 기록해요</Text>
           </View>
 
-          {/* 비밀번호 */}
-          <View style={styles.gap6}>
-            <View style={styles.passwordRow}>
+          <View style={s.fields}>
+            <View>
               <TextInput
-                style={[styles.input, styles.passwordInput]}
-                placeholder="비밀번호 (8자 이상 권장)"
-                placeholderTextColor={Colors.light}
+                style={f('email')}
+                placeholder="이메일"
+                placeholderTextColor={C.ink3}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onFocus={() => setFocused('email')}
+                onBlur={() => setFocused(null)}
+              />
+              {emailValid === false && (
+                <Text style={s.errText}>올바른 이메일 형식을 입력해주세요.</Text>
+              )}
+            </View>
+
+            <View style={s.pwWrap}>
+              <TextInput
+                style={[f('pw'), s.pwInput]}
+                placeholder="비밀번호 (8자 이상)"
+                placeholderTextColor={C.ink3}
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry={!showPassword}
+                secureTextEntry={!showPw}
+                onFocus={() => setFocused('pw')}
+                onBlur={() => setFocused(null)}
               />
-              <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword(v => !v)}>
-                <Text style={styles.eyeText}>{showPassword ? '숨김' : '표시'}</Text>
+              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
+                <Ionicons name={showPw ? 'eye' : 'eye-off'} size={20} color={showPw ? C.brand : C.ink3} />
               </TouchableOpacity>
             </View>
-            {password.length > 0 && (
-              <View style={styles.strengthRow}>
-                <View style={styles.strengthBar}>
-                  {[1, 2, 3].map(i => (
-                    <View
-                      key={i}
-                      style={[styles.strengthSegment, { backgroundColor: i <= strength.level ? strength.color : Colors.border }]}
-                    />
-                  ))}
-                </View>
-                <Text style={[styles.strengthLabel, { color: strength.color }]}>{strength.label}</Text>
+
+            <View>
+              <View style={s.pwWrap}>
+                <TextInput
+                  style={[f('confirm'), s.pwInput]}
+                  placeholder="비밀번호 확인"
+                  placeholderTextColor={C.ink3}
+                  value={confirmPw}
+                  onChangeText={setConfirmPw}
+                  secureTextEntry={!showConfirm}
+                  onFocus={() => setFocused('confirm')}
+                  onBlur={() => setFocused(null)}
+                />
+                <TouchableOpacity style={s.eyeBtn} onPress={() => setShowConfirm(v => !v)}>
+                  <Ionicons name={showConfirm ? 'eye' : 'eye-off'} size={20} color={showConfirm ? C.brand : C.ink3} />
+                </TouchableOpacity>
               </View>
-            )}
+              {pwMatch === false && (
+                <Text style={s.errText}>비밀번호가 일치하지 않아요.</Text>
+              )}
+            </View>
           </View>
 
-          {/* 비밀번호 확인 */}
-          <View>
-            <View style={styles.passwordRow}>
-              <TextInput
-                style={[styles.input, styles.passwordInput, passwordMatch === false && styles.inputError]}
-                placeholder="비밀번호 확인"
-                placeholderTextColor={Colors.light}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showConfirm}
-              />
-              <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowConfirm(v => !v)}>
-                <Text style={styles.eyeText}>{showConfirm ? '숨김' : '표시'}</Text>
-              </TouchableOpacity>
+          <TouchableOpacity style={s.agreeRow} onPress={() => setAgree(v => !v)}>
+            <View style={[s.chk, !agree && s.chkOff]}>
+              {agree && <Ionicons name="checkmark" size={13} color="#fff" />}
             </View>
-            {passwordMatch === false && (
-              <Text style={styles.errorText}>비밀번호가 일치하지 않아요.</Text>
-            )}
-          </View>
-
-          {/* 약관 동의 */}
-          <TouchableOpacity style={styles.checkRow} onPress={() => setAgreedTerms(v => !v)}>
-            <View style={[styles.checkbox, agreedTerms && styles.checkboxOn]}>
-              {agreedTerms && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-            <Text style={styles.checkLabel}>
-              <Text style={styles.checkLinkText}>서비스 이용약관</Text>
-              {'  및  '}
-              <Text style={styles.checkLinkText}>개인정보 처리방침</Text>
-              {'에 동의합니다 (필수)'}
+            <Text style={s.agreeText}>
+              <Text style={s.link}>서비스 이용약관</Text>
+              {' 및 '}
+              <Text style={s.link}>개인정보 처리방침</Text>
+              {'에 동의합니다 '}
+              <Text style={s.required}>(필수)</Text>
             </Text>
           </TouchableOpacity>
 
-          {/* 가입 버튼 */}
           <TouchableOpacity
-            style={[styles.signupBtn, !ready && styles.btnDisabled]}
+            style={s.btnPrimary}
             onPress={handleSignup}
-            disabled={!ready}
+            disabled={loading || !!socialLoading}
+            activeOpacity={0.88}
           >
             {loading
-              ? <ActivityIndicator color={Colors.white} />
-              : <Text style={styles.signupBtnText}>가입하기</Text>
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={s.btnText}>가입하기</Text>
             }
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.loginLink} onPress={() => router.back()}>
-            <Text style={styles.loginLinkText}>
-              이미 계정이 있으신가요? <Text style={styles.loginLinkBold}>로그인</Text>
-            </Text>
-          </TouchableOpacity>
-
-          {/* 소셜 가입 */}
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>또는</Text>
-            <View style={styles.dividerLine} />
+          <View style={s.linkRow}>
+            <Text style={s.linkLabel}>이미 계정이 있으신가요? </Text>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Text style={s.link}>로그인</Text>
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={styles.googleBtn}
-            onPress={() => handleSocialLogin('google')}
-            disabled={!!socialLoading}
-            activeOpacity={0.8}
-          >
-            {socialLoading === 'google'
-              ? <ActivityIndicator color={Colors.text} />
-              : <>
-                  <Text style={styles.googleIcon}>G</Text>
-                  <Text style={styles.googleBtnText}>Google로 계속하기</Text>
-                </>
-            }
-          </TouchableOpacity>
+          <View style={s.divider}>
+            <View style={s.divLine} />
+            <Text style={s.divText}>또는</Text>
+            <View style={s.divLine} />
+          </View>
 
-          <TouchableOpacity
-            style={styles.kakaoBtn}
-            onPress={() => handleSocialLogin('kakao')}
-            disabled={!!socialLoading}
-            activeOpacity={0.8}
-          >
-            {socialLoading === 'kakao'
-              ? <ActivityIndicator color="#3C1E1E" />
-              : <>
-                  <Text style={styles.kakaoIcon}>💬</Text>
-                  <Text style={styles.kakaoBtnText}>카카오로 계속하기</Text>
-                </>
-            }
-          </TouchableOpacity>
+          <View style={s.socials}>
+            <TouchableOpacity style={s.socialCircle} onPress={() => handleSocialLogin('google')} disabled={!!socialLoading} activeOpacity={0.82}>
+              {socialLoading === 'google' ? <ActivityIndicator color={C.ink} size="small" /> : <Text style={s.googleG}>G</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.socialCircle, s.kakaoCircle]} onPress={() => handleSocialLogin('kakao')} disabled={!!socialLoading} activeOpacity={0.82}>
+              {socialLoading === 'kakao' ? <ActivityIndicator color={C.kakaoInk} size="small" /> : <Text style={s.kakaoIcon}>💬</Text>}
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bg },
-  kav: { flex: 1 },
-
-  header: {
-    backgroundColor: Colors.primary,
-    paddingTop: 60, paddingBottom: 48,
-    alignItems: 'center', gap: 8,
-  },
-  backBtn: { position: 'absolute', left: 20, top: 60 },
-  backTxt: { fontSize: 16, color: Colors.white, fontWeight: '600' },
-  logo: { fontSize: 28, fontWeight: '800', color: Colors.white },
-  tagline: { fontSize: 14, color: 'rgba(255,255,255,0.85)' },
-
-  scroll: { flex: 1, backgroundColor: Colors.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -20 },
-  form: { padding: 28, gap: 14, paddingBottom: 48 },
-  formTitle: { fontSize: 20, fontWeight: '800', color: Colors.text, marginBottom: 6 },
-
-  input: {
-    borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: Radius.button,
-    paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 15, color: Colors.text,
-    backgroundColor: Colors.bg,
-  },
-  inputError: { borderColor: '#ef4444' },
-  errorText: { fontSize: 12, color: '#ef4444', marginTop: 4, marginLeft: 4 },
-
-  gap6: { gap: 6 },
-
-  passwordRow: { position: 'relative' },
-  passwordInput: { paddingRight: 64 },
-  eyeBtn: { position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' },
-  eyeText: { fontSize: 13, color: Colors.sub, fontWeight: '600' },
-
-  strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  strengthBar: { flex: 1, flexDirection: 'row', gap: 4 },
-  strengthSegment: { flex: 1, height: 4, borderRadius: 2 },
-  strengthLabel: { fontSize: 12, fontWeight: '700', width: 28 },
-
-  checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  checkbox: {
-    width: 20, height: 20, borderRadius: 5,
-    borderWidth: 1.5, borderColor: Colors.border,
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.bg, marginTop: 1,
-  },
-  checkboxOn: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  checkmark: { fontSize: 12, color: Colors.white, fontWeight: '800' },
-  checkLabel: { flex: 1, fontSize: 13, color: Colors.sub, lineHeight: 20 },
-  checkLinkText: { color: Colors.primary, fontWeight: '700' },
-
-  signupBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: Radius.button,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 4,
-    ...Shadow.card,
-    shadowColor: Colors.primary,
-    shadowOpacity: 0.35,
-  },
-  btnDisabled: { backgroundColor: Colors.light, shadowOpacity: 0 },
-  signupBtnText: { fontSize: 16, fontWeight: '800', color: Colors.white },
-
-  loginLink: { alignItems: 'center', paddingVertical: 4 },
-  loginLinkText: { fontSize: 14, color: Colors.sub },
-  loginLinkBold: { color: Colors.primary, fontWeight: '700' },
-
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
-  dividerText: { fontSize: 12, color: Colors.light, fontWeight: '500' },
-
-  googleBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: Radius.button, paddingVertical: 14,
-    backgroundColor: Colors.white,
-  },
-  googleIcon: { fontSize: 16, fontWeight: '800', color: '#4285F4' },
-  googleBtnText: { fontSize: 15, fontWeight: '600', color: Colors.text },
-
-  kakaoBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    borderRadius: Radius.button, paddingVertical: 14,
-    backgroundColor: '#FEE500',
-  },
-  kakaoIcon: { fontSize: 16 },
-  kakaoBtnText: { fontSize: 15, fontWeight: '700', color: '#3C1E1E' },
-});

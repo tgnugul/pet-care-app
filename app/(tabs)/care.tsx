@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, Animated,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, Animated, BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -74,15 +74,11 @@ export default function CareScreen() {
   const doneCount = todayItems.filter(isDoneToday).length;
   const todaySorted = sortCareItems(todayItems);
 
-  const sevenDaysLater = new Date();
-  sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
-  const sevenDaysStr = localDateStr(sevenDaysLater);
-
   const upcomingItems = schedules
     .filter(s => {
       if (s.frequency === 'daily') return false;
       const due = localDateStr(new Date(s.next_due_at));
-      return due > todayStr && due <= sevenDaysStr;
+      return due > todayStr;
     })
     .sort((a, b) => new Date(a.next_due_at).getTime() - new Date(b.next_due_at).getTime());
 
@@ -112,6 +108,15 @@ export default function CareScreen() {
     setDeleteMode(false);
     setSelected(new Set());
   }
+
+  useEffect(() => {
+    if (!deleteMode) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      exitDeleteMode();
+      return true;
+    });
+    return () => sub.remove();
+  }, [deleteMode]);
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -146,31 +151,33 @@ export default function CareScreen() {
       <View style={styles.header}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>케어 관리</Text>
-          {deleteMode ? (
+          {pet && (deleteMode ? (
             <TouchableOpacity onPress={exitDeleteMode} style={styles.headerBtn}>
-              <Text style={styles.headerBtnText}>완료</Text>
+              <Text style={styles.headerBtnText}>취소</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={enterDeleteMode} style={styles.deleteBtn}>
               <Text style={styles.deleteBtnText}>삭제</Text>
             </TouchableOpacity>
-          )}
+          ))}
         </View>
       </View>
 
       {/* 카운터 / 삭제 모드 안내 */}
-      <View style={styles.counterRow}>
-        {deleteMode ? (
-          <Text style={styles.deleteModeHint}>
-            {selected.size > 0 ? `${selected.size}개 선택됨` : '삭제할 항목을 선택하세요'}
-          </Text>
-        ) : (
-          <View style={styles.counterPill}>
-            <Text style={styles.counterText}>✅ {doneCount}개 완료</Text>
-            <Text style={styles.counterSub}> / 총 {todayItems.length}개</Text>
-          </View>
-        )}
-      </View>
+      {pet && (
+        <View style={styles.counterRow}>
+          {deleteMode ? (
+            <Text style={styles.deleteModeHint}>
+              {selected.size > 0 ? `${selected.size}개 선택됨` : '삭제할 항목을 선택하세요'}
+            </Text>
+          ) : (
+            <View style={styles.counterPill}>
+              <Text style={styles.counterText}>✅ {doneCount}개 완료</Text>
+              <Text style={styles.counterSub}> / 총 {todayItems.length}개</Text>
+            </View>
+          )}
+        </View>
+      )}
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -277,7 +284,7 @@ export default function CareScreen() {
         </ScrollView>
       )}
 
-      {/* 삭제 모드: 하단 삭제 버튼 */}
+      {/* 삭제 모드: 하단 완료 버튼 */}
       {deleteMode && (
         <View style={styles.deleteBar}>
           <TouchableOpacity
@@ -286,7 +293,7 @@ export default function CareScreen() {
             disabled={selected.size === 0}
           >
             <Text style={styles.deleteBarBtnText}>
-              {selected.size > 0 ? `${selected.size}개 삭제` : '항목을 선택하세요'}
+              {selected.size > 0 ? `완료 (${selected.size}개 삭제)` : '항목을 선택하세요'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -309,14 +316,8 @@ export default function CareScreen() {
       </Animated.View>
 
       {/* FAB */}
-      {!deleteMode && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => {
-            if (!pet) { Alert.alert('반려동물 등록 필요', '케어를 추가하려면 반려동물을 먼저 등록해주세요.'); return; }
-            router.push('/care-add');
-          }}
-        >
+      {!deleteMode && pet && (
+        <TouchableOpacity style={styles.fab} onPress={() => router.push('/care-add')}>
           <Text style={styles.fabPlus}>+</Text>
         </TouchableOpacity>
       )}
@@ -421,7 +422,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.danger,
     borderRadius: Radius.button,
     paddingVertical: 15,
-    alignItems: 'center',
+    alignItems: 'center', justifyContent: 'center',
     ...Shadow.card,
     shadowColor: Colors.danger,
     shadowOpacity: 0.3,

@@ -1,12 +1,20 @@
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
+import { useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/design';
 import { HapticTab } from '@/components/haptic-tab';
+import { supabase } from '@/lib/supabase';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) router.replace('/(auth)/login');
+    });
+  }, []);
 
   return (
     <Tabs

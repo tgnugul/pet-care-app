@@ -3,7 +3,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform, Text, TextInput } from 'react-native';
+import { Platform, Text, TextInput, View } from 'react-native';
+import { useFonts } from 'expo-font';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Notifications from 'expo-notifications';
@@ -18,6 +19,7 @@ import { resetRevenueCatUser } from '@/lib/revenuecat';
 import { usePetStore } from '@/stores/pet.store';
 import { useWalkStore } from '@/stores/walk.store';
 import { useSettingsStore } from '@/stores/settings.store';
+import { useFamilyStore } from '@/stores/family.store';
 
 // 시스템 글씨 크기 최대 설정 시 UI가 깨지지 않도록 1.25배로 캡 적용
 (Text as any).defaultProps = { ...((Text as any).defaultProps ?? {}), maxFontSizeMultiplier: 1.25 };
@@ -26,6 +28,21 @@ import { useSettingsStore } from '@/stores/settings.store';
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const { loadSettings } = useSettingsStore();
+  const [fontsLoaded] = useFonts({
+    PretendardVariable: require('@/assets/fonts/PretendardVariable.ttf'),
+  });
+
+  useEffect(() => {
+    if (!fontsLoaded) return;
+    (Text as any).defaultProps = {
+      ...((Text as any).defaultProps ?? {}),
+      style: { fontFamily: 'PretendardVariable' },
+    };
+    (TextInput as any).defaultProps = {
+      ...((TextInput as any).defaultProps ?? {}),
+      style: { fontFamily: 'PretendardVariable' },
+    };
+  }, [fontsLoaded]);
 
   useEffect(() => {
     loadSettings();
@@ -84,6 +101,20 @@ export default function RootLayout() {
         usePetStore.setState({ pets: [] });
         useCareStore.setState({ schedules: [] });
         useWalkStore.setState({ logs: [] });
+        useFamilyStore.setState({ family: null, members: [], pendingRequests: [], myPendingRequest: null });
+        if (Platform.OS === 'android') {
+          try {
+            const { clearWidgetData } = await import('@/lib/widget-storage');
+            const { requestWidgetUpdate } = await import('react-native-android-widget');
+            const { CareWidget } = await import('@/widgets/CareWidget');
+            const { WalkWidget } = await import('@/widgets/WalkWidget');
+            await clearWidgetData();
+            await Promise.all([
+              requestWidgetUpdate({ widgetName: 'CareWidget', renderWidget: () => CareWidget({ data: null, loggedOut: true }), widgetNotFound: () => {} }),
+              requestWidgetUpdate({ widgetName: 'WalkWidget', renderWidget: () => WalkWidget({ state: null, loggedOut: true }), widgetNotFound: () => {} }),
+            ]);
+          } catch {}
+        }
         router.replace('/(auth)/login');
       }
       if (event === 'SIGNED_IN') {
@@ -133,6 +164,10 @@ export default function RootLayout() {
       responseSub.remove();
     };
   }, []);
+
+  if (!fontsLoaded) {
+    return <View style={{ flex: 1, backgroundColor: '#FFF8EF' }} />;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

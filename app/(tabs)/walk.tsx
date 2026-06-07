@@ -96,7 +96,7 @@ export default function WalkScreen() {
   const STATS_DATA = [
     { label: '이번 달 총 거리', value: `${stats.totalDistanceKm.toFixed(1)}km` },
     { label: '이번 달 산책 횟수', value: `${stats.count}회` },
-    { label: '평균 산책 시간', value: stats.avgMinutes > 0 ? formatDuration(Math.round(stats.avgMinutes * 60)) : '-' },
+    { label: '하루 평균 산책 시간', value: stats.avgMinutes > 0 ? formatDuration(Math.round(stats.avgMinutes * 60)) : '-' },
   ];
 
   function toggleSelect(id: string) {
@@ -143,7 +143,6 @@ export default function WalkScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>산책</Text>
-        <Text style={styles.sub}>{petName}와 함께한 시간을 기록해요 🐾</Text>
       </View>
 
       {!petsReady ? (
@@ -277,10 +276,9 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: Colors.white,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16,
   },
-  title: { fontSize: 22, fontWeight: '800', color: Colors.text },
-  sub: { fontSize: 13, color: Colors.sub, marginTop: 4 },
+  title: { fontSize: 20, fontWeight: '800', color: Colors.text },
 
   content: { padding: 20, gap: 16 },
 

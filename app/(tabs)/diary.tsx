@@ -208,18 +208,20 @@ export default function DiaryScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
         <Text style={styles.title}>사진 다이어리</Text>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={handleAdd}
-          disabled={uploading || !!pickedPhoto}
-        >
-          {uploadProgress
-            ? <Text style={styles.addBtnText}>{uploadProgress.done}/{uploadProgress.total} 업로드 중</Text>
-            : uploading
-              ? <ActivityIndicator color={Colors.primary} size="small" />
-              : <Text style={styles.addBtnText}>+ 추가</Text>
-          }
-        </TouchableOpacity>
+        {pet && (
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={handleAdd}
+            disabled={uploading || !!pickedPhoto}
+          >
+            {uploadProgress
+              ? <Text style={styles.addBtnText}>{uploadProgress.done}/{uploadProgress.total} 업로드 중</Text>
+              : uploading
+                ? <ActivityIndicator color={Colors.primary} size="small" />
+                : <Text style={styles.addBtnText}>+ 추가</Text>
+            }
+          </TouchableOpacity>
+        )}
       </View>
 
       {!pet ? (
@@ -507,10 +509,10 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: Colors.white,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  title: { fontSize: 18, fontWeight: '800', color: Colors.text },
+  title: { fontSize: 20, fontWeight: '800', color: Colors.text },
   addBtn: {
     backgroundColor: Colors.primaryLight,
     borderRadius: 10,

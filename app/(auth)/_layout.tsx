@@ -5,6 +5,8 @@ export default function AuthLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="signup" />
+      <Stack.Screen name="find-id" />
+      <Stack.Screen name="find-pw" />
     </Stack>
   );
 }
