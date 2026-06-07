@@ -101,7 +101,9 @@ export default function FindPwScreen() {
   async function handleSend() {
     if (!email.trim()) return;
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: 'pawmate://reset-password',
+    });
     setLoading(false);
     if (error) {
       Alert.alert('오류', '이메일을 확인하고 다시 시도해주세요.');
@@ -169,12 +171,6 @@ export default function FindPwScreen() {
             </Text>
           </View>
 
-          <View style={s.linkRow}>
-            <Text style={s.linkLabel}>아이디가 기억나지 않나요? </Text>
-            <TouchableOpacity onPress={() => router.replace('/(auth)/find-id')}>
-              <Text style={s.link}>아이디 찾기</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

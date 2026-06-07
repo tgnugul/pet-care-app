@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { Ionicons } from '@expo/vector-icons';
+import { GoogleIcon } from '@/components/social-login-icons';
 import { supabase } from '@/lib/supabase';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -26,8 +27,6 @@ const LIGHT = {
   line: '#EFE7DE',
   field: '#F7F0E8',
   fieldLine: '#E7DCD0',
-  kakao: '#FEE500',
-  kakaoInk: '#3B1E1E',
   danger: '#EF4444',
 };
 
@@ -42,8 +41,6 @@ const DARK = {
   line: '#2E2822',
   field: '#252019',
   fieldLine: '#3A3028',
-  kakao: '#FEE500',
-  kakaoInk: '#3B1E1E',
   danger: '#FF6B6B',
 };
 
@@ -109,15 +106,25 @@ function makeStyles(C: typeof LIGHT) {
     divLine: { flex: 1, height: 1, backgroundColor: C.line },
     divText: { fontSize: 13, color: C.ink3, fontWeight: '500' },
 
-    socials: { flexDirection: 'row', justifyContent: 'center', gap: 18 },
-    socialCircle: {
-      width: 54, height: 54, borderRadius: 27,
-      backgroundColor: C.bg, borderWidth: 1.5, borderColor: C.line,
+    socials: { gap: 12 },
+    googleBtn: {
+      height: 48, borderRadius: 4,
+      flexDirection: 'row', alignItems: 'center',
+      paddingLeft: 12, paddingRight: 12, gap: 10,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1, borderColor: '#747775',
+    },
+    googleIconWrap: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+    googleBtnText: {
+      flex: 1, textAlign: 'center',
+      fontSize: 14, fontWeight: '500', color: '#1F1F1F',
+    },
+    kakaoBtn: {
+      height: 48, borderRadius: 12,
+      overflow: 'hidden', backgroundColor: '#FEE500',
       alignItems: 'center', justifyContent: 'center',
     },
-    kakaoCircle: { backgroundColor: C.kakao, borderColor: C.kakao },
-    googleG: { fontSize: 20, fontWeight: '800', color: '#4285F4' },
-    kakaoIcon: { fontSize: 22 },
+    kakaoBtnImage: { width: '100%', height: '100%' },
   });
 }
 
@@ -300,11 +307,36 @@ export default function SignupScreen() {
           </View>
 
           <View style={s.socials}>
-            <TouchableOpacity style={s.socialCircle} onPress={() => handleSocialLogin('google')} disabled={!!socialLoading} activeOpacity={0.82}>
-              {socialLoading === 'google' ? <ActivityIndicator color={C.ink} size="small" /> : <Text style={s.googleG}>G</Text>}
+            <TouchableOpacity
+              style={s.googleBtn}
+              onPress={() => handleSocialLogin('google')}
+              disabled={!!socialLoading}
+              activeOpacity={0.88}
+            >
+              {socialLoading === 'google'
+                ? <ActivityIndicator color="#4285F4" size="small" />
+                : <>
+                    <View style={s.googleIconWrap}>
+                      <GoogleIcon size={20} />
+                    </View>
+                    <Text style={s.googleBtnText}>Google 계정으로 로그인</Text>
+                  </>
+              }
             </TouchableOpacity>
-            <TouchableOpacity style={[s.socialCircle, s.kakaoCircle]} onPress={() => handleSocialLogin('kakao')} disabled={!!socialLoading} activeOpacity={0.82}>
-              {socialLoading === 'kakao' ? <ActivityIndicator color={C.kakaoInk} size="small" /> : <Text style={s.kakaoIcon}>💬</Text>}
+            <TouchableOpacity
+              style={s.kakaoBtn}
+              onPress={() => handleSocialLogin('kakao')}
+              disabled={!!socialLoading}
+              activeOpacity={0.88}
+            >
+              {socialLoading === 'kakao'
+                ? <ActivityIndicator color="#000000" size="small" />
+                : <Image
+                    source={require('@/assets/images/kakao_login_btn.png')}
+                    style={s.kakaoBtnImage}
+                    resizeMode="contain"
+                  />
+              }
             </TouchableOpacity>
           </View>
         </ScrollView>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -9,6 +9,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { GoogleIcon } from '@/components/social-login-icons';
 import { supabase } from '@/lib/supabase';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -113,16 +114,32 @@ function makeStyles(C: typeof LIGHT) {
     divLine: { flex: 1, height: 1, backgroundColor: C.line },
     divText: { fontSize: 13, color: C.ink3, fontWeight: '500' },
 
-    socials: { flexDirection: 'row', justifyContent: 'center', gap: 18 },
-    socialCircle: {
-      width: 54, height: 54, borderRadius: 27,
-      backgroundColor: C.bg,
-      borderWidth: 1.5, borderColor: C.line,
+    socials: { gap: 12 },
+
+    // Google: Google Identity Branding Guidelines
+    // G 로고 왼쪽 고정 | paddingLeft 12 · gap 10 · paddingRight 12
+    // 라이트: #FFFFFF + #747775 테두리 / 다크: #131314 + #8E918F 테두리
+    googleBtn: {
+      height: 48, borderRadius: 4,
+      flexDirection: 'row', alignItems: 'center',
+      paddingLeft: 12, paddingRight: 12, gap: 10,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1, borderColor: '#747775',
+    },
+    googleIconWrap: { width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
+    googleBtnText: {
+      flex: 1, textAlign: 'center',
+      fontSize: 14, fontWeight: '500', color: '#1F1F1F',
+    },
+
+    // Kakao: 공식 버튼 이미지 (developers.kakao.com/tool/resource/login)
+    // 이미지 자체가 완성형 버튼 — 컨테이너는 비율 보존용
+    kakaoBtn: {
+      height: 48, borderRadius: 12,
+      overflow: 'hidden', backgroundColor: '#FEE500',
       alignItems: 'center', justifyContent: 'center',
     },
-    kakaoCircle: { backgroundColor: C.kakao, borderColor: C.kakao },
-    googleG: { fontSize: 20, fontWeight: '800', color: '#4285F4' },
-    kakaoIcon: { fontSize: 22 },
+    kakaoBtnImage: { width: '100%', height: '100%' },
   });
 }
 
@@ -253,15 +270,9 @@ export default function LoginScreen() {
               </View>
               <Text style={s.rememberLabel}>아이디 기억</Text>
             </TouchableOpacity>
-            <View style={s.findLinks}>
-              <TouchableOpacity onPress={() => router.push('/(auth)/find-id')}>
-                <Text style={s.mutedLink}>아이디 찾기</Text>
-              </TouchableOpacity>
-              <Text style={s.dot}>·</Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/find-pw')}>
-                <Text style={s.mutedLink}>비밀번호 찾기</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={() => router.push('/(auth)/find-pw')}>
+              <Text style={s.mutedLink}>비밀번호 찾기</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -290,26 +301,40 @@ export default function LoginScreen() {
           </View>
 
           <View style={s.socials}>
+            {/* Google: 공식 버튼 이미지 */}
             <TouchableOpacity
-              style={s.socialCircle}
+              style={s.googleBtn}
               onPress={() => handleSocialLogin('google')}
               disabled={!!socialLoading}
-              activeOpacity={0.82}
+              activeOpacity={0.88}
             >
               {socialLoading === 'google'
-                ? <ActivityIndicator color={C.ink} size="small" />
-                : <Text style={s.googleG}>G</Text>
+                ? <ActivityIndicator color="#4285F4" size="small" />
+                : <>
+                    <View style={s.googleIconWrap}>
+                      <GoogleIcon size={20} />
+                    </View>
+                    <Text style={s.googleBtnText}>
+                      Google 계정으로 로그인
+                    </Text>
+                  </>
               }
             </TouchableOpacity>
+
+            {/* Kakao: 공식 버튼 이미지 */}
             <TouchableOpacity
-              style={[s.socialCircle, s.kakaoCircle]}
+              style={s.kakaoBtn}
               onPress={() => handleSocialLogin('kakao')}
               disabled={!!socialLoading}
-              activeOpacity={0.82}
+              activeOpacity={0.88}
             >
               {socialLoading === 'kakao'
-                ? <ActivityIndicator color={C.kakaoInk} size="small" />
-                : <Text style={s.kakaoIcon}>💬</Text>
+                ? <ActivityIndicator color="#000000" size="small" />
+                : <Image
+                    source={require('@/assets/images/kakao_login_btn.png')}
+                    style={s.kakaoBtnImage}
+                    resizeMode="contain"
+                  />
               }
             </TouchableOpacity>
           </View>
