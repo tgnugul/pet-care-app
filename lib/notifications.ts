@@ -351,6 +351,71 @@ export async function notifyFamilyNewCare(
   } catch {}
 }
 
+export async function notifyFamilyWalkStarted(
+  familyId: string,
+  myUserId: string,
+  doerName: string,
+  petName: string,
+): Promise<void> {
+  if (!useSettingsStore.getState().familyNotifEnabled) return;
+
+  try {
+    const { data: rows } = await supabase.rpc('get_family_push_tokens', {
+      p_family_id: familyId,
+      p_my_user_id: myUserId,
+    });
+    if (!rows?.length) return;
+
+    const messages = (rows as { token: string }[]).map(({ token }) => ({
+      to: token,
+      title: `${petName} 산책 시작! 🐾`,
+      body: `${doerName}님이 ${petName}와 산책을 시작했어요`,
+      sound: 'default',
+    }));
+
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(messages),
+    });
+  } catch {}
+}
+
+export async function notifyFamilyWalkCompleted(
+  familyId: string,
+  myUserId: string,
+  doerName: string,
+  petName: string,
+  distanceKm: number,
+  durationSec: number,
+): Promise<void> {
+  if (!useSettingsStore.getState().familyNotifEnabled) return;
+
+  const mins = Math.round(durationSec / 60);
+  const timeStr = mins < 60 ? `${mins}분` : `${Math.floor(mins / 60)}시간 ${mins % 60}분`;
+
+  try {
+    const { data: rows } = await supabase.rpc('get_family_push_tokens', {
+      p_family_id: familyId,
+      p_my_user_id: myUserId,
+    });
+    if (!rows?.length) return;
+
+    const messages = (rows as { token: string }[]).map(({ token }) => ({
+      to: token,
+      title: `${petName} 산책 완료! 🐾`,
+      body: `${doerName}님이 ${distanceKm.toFixed(2)}km, ${timeStr} 산책했어요`,
+      sound: 'default',
+    }));
+
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(messages),
+    });
+  } catch {}
+}
+
 export async function notifyFamilyCareCompleted(
   familyId: string,
   myUserId: string,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -6,9 +6,22 @@ import * as Location from 'expo-location';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { usePetStore } from '@/stores/pet.store';
 import { useWalkStore, calcMonthStats, walkEmoji, formatWalkDate } from '@/stores/walk.store';
+import { useFamilyStore } from '@/stores/family.store';
 import { formatDuration } from '@/lib/gps';
 import { getWalkState, type WalkWidgetState } from '@/lib/widget-storage';
 import { syncWalkWidgetData } from '@/lib/widget-sync';
+import { supabase } from '@/lib/supabase';
+
+interface FamilyLiveWalk {
+  user_id: string;
+  walker_name: string;
+  pet_name: string;
+  started_at: string;
+  distance_km: number;
+  duration_sec: number;
+}
+
+const STALE_MS = 5 * 60 * 1000;
 
 function formatTimeRange(startIso: string, endIso: string): string {
   function fmt(iso: string) {
@@ -25,10 +38,14 @@ function formatTimeRange(startIso: string, endIso: string): string {
 export default function WalkScreen() {
   const { pets, fetchPets } = usePetStore();
   const { logs, loading, fetchLogs, deleteLog } = useWalkStore();
+  const { family, myUserId } = useFamilyStore();
   const [editMode, setEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeWalk, setActiveWalk] = useState<WalkWidgetState | null>(null);
   const [activeElapsed, setActiveElapsed] = useState(0);
+  const [familyWalks, setFamilyWalks] = useState<FamilyLiveWalk[]>([]);
+  const [familyElapsed, setFamilyElapsed] = useState<Record<string, number>>({});
+  const familyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // 펫 로딩이 완료됐는지 추적 — 스토어에 이미 있으면 true로 시작 (홈 탭이 먼저 로드된 경우)
   const [petsReady, setPetsReady] = useState(pets.length > 0);
 
@@ -38,6 +55,54 @@ export default function WalkScreen() {
       fetchPets().then(() => setPetsReady(true));
     }
   }, []);
+
+  // 가족 실시간 산책 구독
+  useEffect(() => {
+    if (!family || !myUserId) return;
+
+    async function fetchFamilyWalks() {
+      const { data } = await supabase
+        .from('live_walks')
+        .select('user_id, walker_name, pet_name, started_at, distance_km, duration_sec, updated_at')
+        .eq('family_id', family!.id)
+        .neq('user_id', myUserId);
+
+      const fresh = ((data ?? []) as (FamilyLiveWalk & { updated_at: string })[]).filter(
+        (w) => Date.now() - new Date(w.updated_at).getTime() < STALE_MS,
+      );
+      setFamilyWalks(fresh);
+    }
+
+    fetchFamilyWalks();
+
+    const channel = supabase
+      .channel(`family_walks:${family.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'live_walks', filter: `family_id=eq.${family.id}` },
+        () => { fetchFamilyWalks(); },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [family?.id, myUserId]);
+
+  // 가족 산책 경과 시간 타이머
+  useEffect(() => {
+    familyTimerRef.current && clearInterval(familyTimerRef.current);
+    if (familyWalks.length === 0) return;
+
+    function tick() {
+      const next: Record<string, number> = {};
+      for (const w of familyWalks) {
+        next[w.user_id] = Math.floor((Date.now() - new Date(w.started_at).getTime()) / 1000);
+      }
+      setFamilyElapsed(next);
+    }
+    tick();
+    familyTimerRef.current = setInterval(tick, 1000);
+    return () => { familyTimerRef.current && clearInterval(familyTimerRef.current); };
+  }, [familyWalks]);
 
 
   useFocusEffect(useCallback(() => {
@@ -184,6 +249,41 @@ export default function WalkScreen() {
           </TouchableOpacity>
         )}
 
+        {/* 가족 실시간 산책 카드 */}
+        {familyWalks.map((fw) => (
+          <TouchableOpacity
+            key={fw.user_id}
+            style={styles.familyWalkCard}
+            activeOpacity={0.85}
+            onPress={() => router.push({ pathname: '/walk-live', params: { userId: fw.user_id } })}
+          >
+            <View style={styles.familyWalkHeader}>
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveTxt}>LIVE</Text>
+              </View>
+              <Text style={{ fontSize: 22 }}>🐕</Text>
+            </View>
+            <Text style={styles.familyWalkName}>
+              {fw.walker_name}님이 {fw.pet_name}와 산책 중
+            </Text>
+            <View style={styles.familyWalkStats}>
+              <View style={styles.activeWalkStat}>
+                <Text style={styles.activeWalkValue}>
+                  {formatDuration(familyElapsed[fw.user_id] ?? 0)}
+                </Text>
+                <Text style={styles.activeWalkUnit}>시간</Text>
+              </View>
+              <View style={styles.activeWalkDivider} />
+              <View style={styles.activeWalkStat}>
+                <Text style={styles.activeWalkValue}>{fw.distance_km.toFixed(2)}km</Text>
+                <Text style={styles.activeWalkUnit}>거리</Text>
+              </View>
+            </View>
+            <Text style={styles.activeWalkHint}>탭해서 실시간 산책 보기</Text>
+          </TouchableOpacity>
+        ))}
+
         {/* 이달 통계 */}
         <View style={styles.statsCard}>
           {STATS_DATA.map((s, i) => (
@@ -318,6 +418,29 @@ const styles = StyleSheet.create({
   activeWalkUnit: { fontSize: 11, color: 'rgba(255,255,255,0.75)' as any },
   activeWalkDivider: { width: 1, height: 36, backgroundColor: 'rgba(255,255,255,0.3)' as any },
   activeWalkHint: { fontSize: 12, color: 'rgba(255,255,255,0.75)' as any, textAlign: 'center' },
+
+  familyWalkCard: {
+    backgroundColor: Colors.accentLight,
+    borderRadius: Radius.card + 4,
+    paddingVertical: 18, paddingHorizontal: 20,
+    gap: 10,
+    borderWidth: 1.5, borderColor: Colors.accent,
+    ...Shadow.sm,
+  },
+  familyWalkHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  familyWalkName: { fontSize: 14, fontWeight: '700', color: Colors.text },
+  familyWalkStats: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+  },
+  liveBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: Colors.danger,
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4,
+  },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
+  liveTxt: { fontSize: 11, fontWeight: '800', color: '#fff', letterSpacing: 1 },
 
   startEmoji: { fontSize: 40 },
   startLabel: { fontSize: 18, fontWeight: '800', color: Colors.white },

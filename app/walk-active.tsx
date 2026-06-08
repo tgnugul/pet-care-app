@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Alert, Platform, Pressable,
+  View, Text, TouchableOpacity, StyleSheet, Alert, Platform, Pressable, BackHandler,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,8 +13,11 @@ import { calcDistance, formatDuration } from '@/lib/gps';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { supabase } from '@/lib/supabase';
 import { useWalkStore } from '@/stores/walk.store';
-import { WALK_LOCATION_TASK, WALK_ROUTE_KEY } from '@/lib/walk-task';
+import { usePetStore } from '@/stores/pet.store';
+import { useFamilyStore } from '@/stores/family.store';
+import { WALK_LOCATION_TASK, WALK_ROUTE_KEY, WALK_META_KEY, WALK_LAST_PUSHED_KEY } from '@/lib/walk-task';
 import { setWalkState, clearWalkState, getWalkState } from '@/lib/widget-storage';
+import { notifyFamilyWalkCompleted, notifyFamilyWalkStarted } from '@/lib/notifications';
 
 type Coord = { latitude: number; longitude: number };
 
@@ -152,7 +155,7 @@ function LeafletMapSection({ region, route, webViewRef }: {
       longitude: region.longitude,
       route,
     }));
-  }, [region, route]);
+  }, [region, route, loaded]);
 
   return (
     <WebView
@@ -218,6 +221,8 @@ function MapSection({ region, route, mapRef, webViewRef }: {
 
 export default function WalkActiveScreen() {
   const { fetchLogs } = useWalkStore();
+  const { pets } = usePetStore();
+  const { family, myUserId, members } = useFamilyStore();
   const { autostart, autostop } = useLocalSearchParams<{ autostart?: string; autostop?: string }>();
   const [isTracking, setIsTracking] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -285,6 +290,17 @@ export default function WalkActiveScreen() {
     }
   }, [isTracking]);
 
+  // 산책 중 뒤로 가기 → GPS 유지하고 백그라운드로 최소화
+  useEffect(() => {
+    if (!isTracking) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      autostartDismissRef.current = true;
+      goBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [isTracking]);
+
   async function initMap() {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -314,6 +330,31 @@ export default function WalkActiveScreen() {
             const last = existingRoute[existingRoute.length - 1];
             setRegion({ ...last, latitudeDelta: 0.003, longitudeDelta: 0.003 });
             lastCoord.current = last;
+          }
+
+          let initDist = 0;
+          for (let i = 1; i < existingRoute.length; i++) {
+            initDist += calcDistance(
+              existingRoute[i - 1].latitude, existingRoute[i - 1].longitude,
+              existingRoute[i].latitude, existingRoute[i].longitude,
+            );
+          }
+          setDistance(initDist);
+          distanceRef.current = initDist;
+
+          const isTaskRunning = await TaskManager.isTaskRegisteredAsync(WALK_LOCATION_TASK);
+          if (!isTaskRunning) {
+            await Location.startLocationUpdatesAsync(WALK_LOCATION_TASK, {
+              accuracy: Location.Accuracy.BestForNavigation,
+              distanceInterval: 5,
+              timeInterval: 30000,
+              foregroundService: {
+                notificationTitle: '뽀시래기 산책 중',
+                notificationBody: '산책 경로를 기록하고 있어요.',
+                notificationColor: '#F5A623',
+              },
+              pausesUpdatesAutomatically: false,
+            });
           }
 
           timerRef.current = setInterval(() => {
@@ -374,6 +415,29 @@ export default function WalkActiveScreen() {
     setRoute(initialRoute);
     await setWalkState({ isWalking: true, startedAt: now.toISOString(), distanceKm: 0, durationSec: 0 });
 
+    if (family && myUserId) {
+      const doerName = members.find(m => m.user_id === myUserId)?.display_name ?? '가족';
+      const petName = pets[0]?.name ?? '반려동물';
+      notifyFamilyWalkStarted(family.id, myUserId, doerName, petName);
+
+      // 가족 공유용 메타 저장 + 초기 live_walks 행 upsert
+      const meta = { familyId: family.id, walkerId: myUserId, walkerName: doerName, petName };
+      await AsyncStorage.setItem(WALK_META_KEY, JSON.stringify(meta));
+      await AsyncStorage.removeItem(WALK_LAST_PUSHED_KEY);
+      await supabase.from('live_walks').upsert({
+        user_id: myUserId,
+        family_id: family.id,
+        walker_name: doerName,
+        pet_name: petName,
+        started_at: now.toISOString(),
+        distance_km: 0,
+        duration_sec: 0,
+        route_coordinates: initialRoute,
+        updated_at: now.toISOString(),
+      }, { onConflict: 'user_id' });
+      await AsyncStorage.setItem(WALK_LAST_PUSHED_KEY, String(Date.now()));
+    }
+
     timerRef.current = setInterval(() => {
       if (startTimestamp.current !== null) {
         setElapsed(Math.floor((Date.now() - startTimestamp.current) / 1000));
@@ -383,6 +447,7 @@ export default function WalkActiveScreen() {
     await Location.startLocationUpdatesAsync(WALK_LOCATION_TASK, {
       accuracy: Location.Accuracy.BestForNavigation,
       distanceInterval: 5,
+      timeInterval: 30000,
       foregroundService: {
         notificationTitle: '뽀시래기 산책 중',
         notificationBody: '산책 경로를 기록하고 있어요.',
@@ -446,6 +511,14 @@ export default function WalkActiveScreen() {
         route_coordinates: finalRoute,
       });
       await fetchLogs();
+      if (family && myUserId) {
+        const doerName = members.find(m => m.user_id === myUserId)?.display_name ?? '가족';
+        const petName = pets[0]?.name ?? '반려동물';
+        notifyFamilyWalkCompleted(family.id, myUserId, doerName, petName, Math.round(totalDistance * 1000) / 1000, elapsed);
+        // 가족 공유 행 삭제 및 메타 정리
+        await supabase.from('live_walks').delete().eq('user_id', myUserId);
+        await AsyncStorage.multiRemove([WALK_META_KEY, WALK_LAST_PUSHED_KEY]);
+      }
     }
 
     if (Platform.OS === 'android') {
@@ -471,6 +544,10 @@ export default function WalkActiveScreen() {
           text: '종료', style: 'destructive', onPress: async () => {
             stopAll();
             await clearWalkState();
+            if (myUserId) {
+              await supabase.from('live_walks').delete().eq('user_id', myUserId);
+              await AsyncStorage.multiRemove([WALK_META_KEY, WALK_LAST_PUSHED_KEY]);
+            }
             if (Platform.OS === 'android') {
               try {
                 const { requestWidgetUpdate } = await import('react-native-android-widget');
