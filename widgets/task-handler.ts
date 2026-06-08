@@ -17,8 +17,9 @@ function todayStr(): string {
 
 async function fetchAndBuildWidgetData(): Promise<WidgetData | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return null;
+    const user = session.user;
 
     const { data: pet } = await supabase
       .from('pets')
@@ -78,6 +79,11 @@ export function registerWidgetTaskHandlers(): void {
         if (widgetAction === 'WIDGET_CLICK' && clickAction === 'STOP_WALK') {
           await stopWalkFromWidget(renderWidget);
         } else {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            renderWidget(WalkWidget({ state: null, loggedOut: true }));
+            return;
+          }
           try {
             const [walkState, cache] = await Promise.all([getWalkState(), getWalkWidgetCache()]);
             renderWidget(WalkWidget({ state: walkState, cache }));
@@ -95,6 +101,12 @@ export function registerWidgetTaskHandlers(): void {
           await toggleScheduleDone(id, done, renderWidget);
           return;
         }
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        renderWidget(CareWidget({ data: null, loggedOut: true }));
+        return;
       }
 
       const today = todayStr();
@@ -264,16 +276,40 @@ async function stopWalkFromWidget(
     renderWidget(WalkWidget({ state: null, cache }));
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && elapsedSec > 0) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && elapsedSec > 0) {
         await supabase.from('walk_logs').insert({
-          user_id: user.id,
+          user_id: session.user.id,
           started_at: startedAt,
           ended_at: endedAt,
           duration_minutes: Math.round((elapsedSec / 60) * 10) / 10,
           distance_km: Math.round(totalDistance * 1000) / 1000,
           route_coordinates: finalRoute,
         });
+
+        const { data: membership } = await supabase
+          .from('family_members')
+          .select('family_id, display_name')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        if (membership?.family_id) {
+          const { data: pet } = await supabase
+            .from('pets')
+            .select('name')
+            .eq('user_id', session.user.id)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          const { notifyFamilyWalkCompleted } = await import('@/lib/notifications');
+          notifyFamilyWalkCompleted(
+            membership.family_id,
+            session.user.id,
+            membership.display_name ?? '가족',
+            pet?.name ?? '반려동물',
+            Math.round(totalDistance * 1000) / 1000,
+            elapsedSec,
+          );
+        }
       }
     } catch {}
   } catch {

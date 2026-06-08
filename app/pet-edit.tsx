@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Switch, Image,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Switch, Image, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from '@/lib/supabase';
 import { Colors, Radius, Shadow } from '@/constants/design';
-import { usePetStore, Pet } from '@/stores/pet.store';
+import { usePetStore } from '@/stores/pet.store';
 
 function base64ToBytes(base64: string): Uint8Array {
   const binary = atob(base64);
@@ -17,17 +17,7 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes;
 }
 
-type Species = Pet['species'];
 type Gender = 'male' | 'female' | null;
-
-const SPECIES_OPTIONS: { value: Species; label: string; emoji: string }[] = [
-  { value: 'dog', label: '강아지', emoji: '🐶' },
-  { value: 'cat', label: '고양이', emoji: '🐱' },
-  { value: 'rabbit', label: '토끼', emoji: '🐰' },
-  { value: 'bird', label: '새', emoji: '🐦' },
-  { value: 'fish', label: '물고기', emoji: '🐟' },
-  { value: 'other', label: '기타', emoji: '🐾' },
-];
 
 export default function PetEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +25,6 @@ export default function PetEditScreen() {
   const pet = pets.find(p => p.id === id);
 
   const [name, setName] = useState('');
-  const [species, setSpecies] = useState<Species>('dog');
   const [breed, setBreed] = useState('');
   const [birthday, setBirthday] = useState('');
   const [gender, setGender] = useState<Gender>(null);
@@ -44,11 +33,11 @@ export default function PetEditScreen() {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
 
   useEffect(() => {
     if (!pet) return;
     setName(pet.name);
-    setSpecies(pet.species);
     setBreed(pet.breed ?? '');
     setBirthday(pet.birthday ?? '');
     setGender(pet.gender ?? null);
@@ -58,15 +47,7 @@ export default function PetEditScreen() {
   }, [pet?.id]);
 
   function pickPhoto() {
-    const buttons: Parameters<typeof Alert.alert>[2] = [
-      { text: '카메라로 촬영', onPress: pickFromCamera },
-      { text: '앨범에서 선택', onPress: pickFromGallery },
-    ];
-    if (photoUri ?? existingPhotoUrl) {
-      buttons.push({ text: '사진 제거', style: 'destructive', onPress: () => { setPhotoUri(null); setExistingPhotoUrl(null); } });
-    }
-    buttons.push({ text: '취소', style: 'cancel' });
-    Alert.alert('프로필 사진', '사진을 선택하는 방법을 선택해주세요', buttons);
+    setShowPhotoPicker(true);
   }
 
   async function pickFromCamera() {
@@ -126,7 +107,6 @@ export default function PetEditScreen() {
 
     const ok = await updatePet(id!, {
       name: name.trim(),
-      species,
       breed: breed.trim() || null,
       birthday: birthday.trim() || null,
       gender: gender ?? null,
@@ -149,11 +129,11 @@ export default function PetEditScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>‹</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
+          <Text style={styles.headerBtnText}>취소</Text>
         </TouchableOpacity>
         <Text style={styles.title}>반려동물 수정</Text>
-        <View style={styles.backBtn} />
+        <View style={styles.headerBtn} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -171,23 +151,6 @@ export default function PetEditScreen() {
             <Text style={styles.photoEditBadgeText}>✎</Text>
           </View>
         </TouchableOpacity>
-
-        {/* 종류 */}
-        <Text style={styles.label}>종류 *</Text>
-        <View style={styles.speciesRow}>
-          {SPECIES_OPTIONS.map(opt => (
-            <TouchableOpacity
-              key={opt.value}
-              style={[styles.speciesBtn, species === opt.value && styles.speciesBtnActive]}
-              onPress={() => setSpecies(opt.value)}
-            >
-              <Text style={styles.speciesEmoji}>{opt.emoji}</Text>
-              <Text style={[styles.speciesLabel, species === opt.value && styles.speciesLabelActive]}>
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* 이름 */}
         <Text style={styles.label}>이름 *</Text>
@@ -275,6 +238,33 @@ export default function PetEditScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <Modal
+        visible={showPhotoPicker}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowPhotoPicker(false)}
+      >
+        <View style={styles.pickerOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowPhotoPicker(false)} />
+          <View style={styles.pickerSheet}>
+            <TouchableOpacity style={styles.pickerItem} onPress={() => { setShowPhotoPicker(false); pickFromCamera(); }}>
+              <Text style={styles.pickerItemText}>카메라로 촬영</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.pickerItem} onPress={() => { setShowPhotoPicker(false); pickFromGallery(); }}>
+              <Text style={styles.pickerItemText}>앨범에서 선택</Text>
+            </TouchableOpacity>
+            {!!(photoUri ?? existingPhotoUrl) && (
+              <TouchableOpacity style={styles.pickerItem} onPress={() => { setShowPhotoPicker(false); setPhotoUri(null); setExistingPhotoUrl(null); }}>
+                <Text style={[styles.pickerItemText, { color: Colors.danger }]}>사진 제거</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.pickerCancel} onPress={() => setShowPhotoPicker(false)}>
+              <Text style={styles.pickerCancelText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -288,8 +278,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bg,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  backBtn: { width: 48, height: 40, alignItems: 'center', justifyContent: 'center' },
-  backBtnText: { fontSize: 28, color: Colors.text, lineHeight: 32 },
+  headerBtn: { width: 52, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerBtnText: { fontSize: 15, color: Colors.sub, fontWeight: '500' },
   title: { fontSize: 17, fontWeight: '700', color: Colors.text },
 
   content: { padding: 20, gap: 8 },
@@ -313,20 +303,6 @@ const styles = StyleSheet.create({
 
   label: { fontSize: 13, fontWeight: '700', color: Colors.sub, marginTop: 8 },
   optional: { fontWeight: '400', color: Colors.light },
-
-  speciesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  speciesBtn: {
-    borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: Radius.button,
-    paddingVertical: 10, paddingHorizontal: 14,
-    alignItems: 'center', gap: 4,
-    backgroundColor: Colors.white,
-    minWidth: 72,
-  },
-  speciesBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  speciesEmoji: { fontSize: 22 },
-  speciesLabel: { fontSize: 12, fontWeight: '600', color: Colors.sub },
-  speciesLabelActive: { color: Colors.primary },
 
   input: {
     borderWidth: 1.5, borderColor: Colors.border,
@@ -373,4 +349,18 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { backgroundColor: Colors.light, shadowOpacity: 0 },
   saveBtnText: { fontSize: 16, fontWeight: '800', color: Colors.white },
+
+  pickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  pickerSheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingBottom: 34, overflow: 'hidden',
+  },
+  pickerItem: {
+    paddingVertical: 17, alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  pickerItemText: { fontSize: 16, color: Colors.text },
+  pickerCancel: { paddingVertical: 17, alignItems: 'center', marginTop: 8 },
+  pickerCancelText: { fontSize: 16, fontWeight: '700', color: Colors.sub },
 });

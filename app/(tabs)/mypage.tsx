@@ -7,14 +7,29 @@ import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Colors, Radius, Shadow } from '@/constants/design';
 import { supabase } from '@/lib/supabase';
-import { usePetStore, SPECIES_EMOJI, formatAge } from '@/stores/pet.store';
+import { usePetStore, formatAge } from '@/stores/pet.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useFamilyStore } from '@/stores/family.store';
 
-const STATIC_MENU = [
-  { emoji: '📊', label: '월간 건강 리포트', sub: '' },
-  { emoji: '🏥', label: '동물병원 즐겨찾기', sub: '저장된 병원 0곳' },
-  { emoji: '⚙️', label: '앱 설정', sub: '' },
+const MP = {
+  bg: Colors.bg,
+  text: '#33281D',
+  sub: '#9B8B7A',
+  muted: '#BCAE9F',
+  border: '#F0E7DC',
+  orange: Colors.primary,
+  chipBg: '#FCEAD0',
+  tintBox: '#FEF5E8',
+  green: '#2EA56A',
+  red: '#DE5B4E',
+  genderBlue: '#6FA8DC',
+  genderPink: '#E88BA6',
+};
+
+const MENU_ITEMS = [
+  { icon: '📊', label: '월간 건강 리포트', sub: '', chipBg: '#EEF4FF', route: '/health-report' },
+  { icon: '🏥', label: '동물병원 즐겨찾기', sub: '저장된 병원 0곳', chipBg: '#EDF7F2', route: null },
+  { icon: '⚙', label: '앱 설정', sub: '', chipBg: '#F3EEFF', route: '/settings' },
 ];
 
 export default function MyPageScreen() {
@@ -40,6 +55,9 @@ export default function MyPageScreen() {
   const [editProfileVisible, setEditProfileVisible] = useState(false);
   const [nicknameInput, setNicknameInput] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
+  const [pendingPetPhotoUri, setPendingPetPhotoUri] = useState<string | null>(null);
+  const [pendingPetPhotoId, setPendingPetPhotoId] = useState<string | null>(null);
+  const [photoPickerPetId, setPhotoPickerPetId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPets();
@@ -131,16 +149,19 @@ export default function MyPageScreen() {
   }
 
   function handleChangePetPhoto(petId: string) {
-    const hasPhoto = !!pets.find(p => p.id === petId)?.profile_photo_url;
-    const buttons: Parameters<typeof Alert.alert>[2] = [
-      { text: '카메라로 촬영', onPress: () => pickPetPhotoFromCamera(petId) },
-      { text: '앨범에서 선택', onPress: () => pickPetPhotoFromGallery(petId) },
-    ];
-    if (hasPhoto) {
-      buttons.push({ text: '사진 제거', style: 'destructive', onPress: () => updatePet(petId, { profile_photo_url: null }) });
+    setPhotoPickerPetId(petId);
+  }
+
+  function cancelPendingPhoto() {
+    setPendingPetPhotoUri(null);
+    setPendingPetPhotoId(null);
+  }
+
+  function confirmPendingPhoto() {
+    if (pendingPetPhotoId && pendingPetPhotoUri) {
+      uploadPetPhoto(pendingPetPhotoId, pendingPetPhotoUri);
     }
-    buttons.push({ text: '취소', style: 'cancel' });
-    Alert.alert('프로필 사진 변경', '사진을 선택하는 방법을 선택해주세요', buttons);
+    cancelPendingPhoto();
   }
 
   async function pickPetPhotoFromCamera(petId: string) {
@@ -150,12 +171,12 @@ export default function MyPageScreen() {
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
     });
-    if (!result.canceled) uploadPetPhoto(petId, result.assets[0].uri);
+    if (!result.canceled) {
+      setPendingPetPhotoId(petId);
+      setPendingPetPhotoUri(result.assets[0].uri);
+    }
   }
 
   async function pickPetPhotoFromGallery(petId: string) {
@@ -165,12 +186,12 @@ export default function MyPageScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+      mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
     });
-    if (!result.canceled) uploadPetPhoto(petId, result.assets[0].uri);
+    if (!result.canceled) {
+      setPendingPetPhotoId(petId);
+      setPendingPetPhotoUri(result.assets[0].uri);
+    }
   }
 
   async function uploadPetPhoto(petId: string, uri: string) {
@@ -178,7 +199,6 @@ export default function MyPageScreen() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-
       const resized = await manipulateAsync(
         uri,
         [{ resize: { width: 400, height: 400 } }],
@@ -192,7 +212,6 @@ export default function MyPageScreen() {
         .from('pet-photos')
         .upload(filePath, bytes, { contentType: 'image/jpeg', upsert: true });
       if (uploadError) { Alert.alert('업로드 실패', uploadError.message); return; }
-
       const { data: urlData } = supabase.storage.from('pet-photos').getPublicUrl(filePath);
       await updatePetPhoto(petId, urlData.publicUrl);
     } finally {
@@ -219,9 +238,14 @@ export default function MyPageScreen() {
   async function handleSaveProfile() {
     if (!nicknameInput.trim()) return;
     setProfileSaving(true);
-    const { data, error } = await supabase.auth.updateUser({
-      data: { display_name: nicknameInput.trim() },
-    });
+    const trimmed = nicknameInput.trim();
+    const { data, error } = await supabase.auth.updateUser({ data: { display_name: trimmed } });
+    if (!error && data.user) {
+      await supabase.from('profiles').upsert(
+        { user_id: data.user.id, nickname: trimmed },
+        { onConflict: 'user_id' }
+      );
+    }
     setProfileSaving(false);
     if (!error && data.user) {
       setDisplayName(data.user.user_metadata?.display_name ?? null);
@@ -248,38 +272,37 @@ export default function MyPageScreen() {
   const profileName = displayName
     ? `${displayName}님`
     : pets[0] ? `${pets[0].name} 보호자님` : '보호자님';
+  const profileInitial = (displayName ?? userEmail ?? '?')[0].toUpperCase();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* 프로필 헤더 */}
-      <View style={styles.profileHeader}>
-        <View style={styles.profileCircleBg} />
-        <View style={styles.avatarRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarEmoji}>👤</Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+        {/* 프로필 카드 */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatarWrap}>
+            <Text style={styles.avatarInitial}>{profileInitial}</Text>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.userName}>{profileName}</Text>
             <Text style={styles.userEmail}>{userEmail ?? ''}</Text>
           </View>
           <TouchableOpacity style={styles.editProfileBtn} onPress={handleOpenEditProfile}>
+            <Text style={styles.editIcon}>✎</Text>
             <Text style={styles.editProfileTxt}>편집</Text>
           </TouchableOpacity>
         </View>
-      </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-        {/* 반려동물 */}
+        {/* 나의 반려동물 */}
         <Text style={styles.sectionTitle}>나의 반려동물</Text>
 
         {loading ? (
           <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-            <ActivityIndicator color={Colors.primary} />
+            <ActivityIndicator color={MP.orange} />
           </View>
         ) : pets.length === 0 ? (
-          <View style={[styles.petCard, { justifyContent: 'center', paddingVertical: 24 }]}>
-            <Text style={{ color: Colors.sub, fontSize: 14, textAlign: 'center' }}>
+          <View style={[styles.emptyCard, { paddingVertical: 24 }]}>
+            <Text style={{ color: MP.sub, fontSize: 14, textAlign: 'center' }}>
               등록된 반려동물이 없어요
             </Text>
           </View>
@@ -287,43 +310,64 @@ export default function MyPageScreen() {
           pets.map(pet => {
             const age = formatAge(pet.birthday);
             const genderLabel = pet.gender === 'male' ? '♂' : pet.gender === 'female' ? '♀' : null;
+            const genderColor = pet.gender === 'male' ? MP.genderBlue : MP.genderPink;
             return (
-              <TouchableOpacity
-                key={pet.id}
-                style={styles.petCard}
-                onPress={() => router.push(`/pet/${pet.id}` as any)}
-                activeOpacity={0.85}
-              >
-                <TouchableOpacity style={styles.petAvatar} onPress={() => handleChangePetPhoto(pet.id)} activeOpacity={0.8}>
-                  {uploadingPhotoId === pet.id ? (
-                    <ActivityIndicator color={Colors.primary} />
-                  ) : pet.profile_photo_url ? (
-                    <Image source={{ uri: pet.profile_photo_url }} style={styles.petAvatarPhoto} />
-                  ) : (
-                    <Text style={{ fontSize: 30 }}>{SPECIES_EMOJI[pet.species]}</Text>
-                  )}
-                  <Image source={require('@/assets/images/camera-add.png')} style={styles.petAvatarCameraIcon} />
-                </TouchableOpacity>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.petNameRow}>
-                    <Text style={styles.petName}>{pet.name}</Text>
-                    {genderLabel && <Text style={styles.petGender}>{genderLabel}</Text>}
-                  </View>
-                  {pet.breed && (
-                    <View style={styles.breedPill}>
-                      <Text style={styles.breedText}>{pet.breed}</Text>
+              <View key={pet.id} style={styles.petCard}>
+                <TouchableOpacity
+                  style={styles.petTopRow}
+                  onPress={() => router.push(`/pet/${pet.id}` as any)}
+                  activeOpacity={0.85}
+                >
+                  <TouchableOpacity
+                    style={styles.petAvatar}
+                    onPress={() => handleChangePetPhoto(pet.id)}
+                    activeOpacity={0.8}
+                  >
+                    {uploadingPhotoId === pet.id ? (
+                      <ActivityIndicator color={MP.orange} />
+                    ) : pet.profile_photo_url ? (
+                      <Image source={{ uri: pet.profile_photo_url }} style={styles.petAvatarPhoto} />
+                    ) : (
+                      <Text style={styles.petAvatarLetter}>{pet.name.charAt(0)}</Text>
+                    )}
+                    <Image source={require('@/assets/images/camera-add.png')} style={styles.petCameraIcon} />
+                  </TouchableOpacity>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.petNameRow}>
+                      <Text style={styles.petName}>{pet.name}</Text>
+                      {genderLabel && (
+                        <Text style={[styles.petGender, { color: genderColor }]}>{genderLabel}</Text>
+                      )}
                     </View>
-                  )}
-                  <View style={styles.petMetaRow}>
-                    {age && <Text style={styles.petMeta}>{age}</Text>}
-                    {pet.weight && <Text style={styles.petMeta}>{pet.weight}kg</Text>}
-                    <Text style={[styles.petMeta, { color: Colors.accent, fontWeight: '600' }]}>
-                      {pet.neutered ? '중성화 ✓' : '미중성화'}
+                    {pet.breed && (
+                      <View style={styles.breedChip}>
+                        <Text style={styles.breedText}>{pet.breed}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </TouchableOpacity>
+
+                <View style={styles.statDivider} />
+                <View style={styles.statRow}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>나이</Text>
+                    <Text style={styles.statValue}>{age ?? '-'}</Text>
+                  </View>
+                  <View style={styles.statSep} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>몸무게</Text>
+                    <Text style={styles.statValue}>{pet.weight ? `${pet.weight}kg` : '-'}</Text>
+                  </View>
+                  <View style={styles.statSep} />
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>중성화</Text>
+                    <Text style={[styles.statValue, pet.neutered ? { color: MP.green } : {}]}>
+                      {pet.neutered ? '✓ 완료' : '미완료'}
                     </Text>
                   </View>
                 </View>
-                <Text style={{ fontSize: 18, color: Colors.light }}>›</Text>
-              </TouchableOpacity>
+              </View>
             );
           })
         )}
@@ -337,51 +381,64 @@ export default function MyPageScreen() {
           <Text style={styles.addPetLabel}>반려동물 추가하기</Text>
         </TouchableOpacity>
 
-        {/* 패밀리 그룹 */}
+        {/* 우리 가족 */}
         <Text style={[styles.sectionTitle, { marginTop: 8 }]}>우리 가족</Text>
 
         {familyLoading ? (
           <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-            <ActivityIndicator color={Colors.primary} />
+            <ActivityIndicator color={MP.orange} />
           </View>
         ) : family ? (
           <View style={styles.familyCard}>
-            {/* 패밀리 이름 */}
             <View style={styles.familyHeader}>
-              <Text style={styles.familyName}>🏠 {family.name}</Text>
-              <Text style={styles.memberCount}>{members.length}/4명</Text>
+              <Text style={styles.familyName}>{family.name}</Text>
+              <View style={styles.memberCountChip}>
+                <Text style={styles.memberCountText}>{members.length}/4</Text>
+              </View>
             </View>
 
-            {/* 멤버 목록 */}
-            {members.map(m => (
-              <View key={m.id} style={styles.memberRow}>
-                <View style={styles.memberAvatar}>
-                  <Text style={{ fontSize: 16 }}>{m.role === 'owner' ? '👑' : '🐾'}</Text>
+            {members.map(m => {
+              const initial = (m.display_name || m.email || '?')[0].toUpperCase();
+              return (
+                <View key={m.id} style={styles.memberRow}>
+                  <View style={[styles.memberAvatar, m.role === 'owner' && styles.ownerAvatar]}>
+                    <Text style={[styles.memberAvatarText, m.role === 'owner' && styles.ownerAvatarText]}>
+                      {m.role === 'owner' ? '★' : initial}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.memberNameRow}>
+                      <Text style={styles.memberName}>
+                        {m.display_name || m.email}{m.user_id === myUserId ? ' (나)' : ''}
+                      </Text>
+                      <View style={[styles.roleBadge, m.role === 'owner' && styles.ownerBadge]}>
+                        <Text style={[styles.roleBadgeTxt, m.role === 'owner' && styles.ownerBadgeTxt]}>
+                          {m.role === 'owner' ? '방장' : '멤버'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.memberEmailSub}>{m.email}</Text>
+                  </View>
+                  {family.owner_id === myUserId && m.user_id !== myUserId && (
+                    <TouchableOpacity onPress={() => handleRemoveMember(m.user_id, m.email)}>
+                      <Text style={styles.removeBtn}>내보내기</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.memberEmail}>{m.display_name || m.email}</Text>
-                  <Text style={styles.memberRole}>{m.role === 'owner' ? '방장' : '멤버'}{m.user_id === myUserId ? ' (나)' : ''}</Text>
-                </View>
-                {family.owner_id === myUserId && m.user_id !== myUserId && (
-                  <TouchableOpacity onPress={() => handleRemoveMember(m.user_id, m.email)}>
-                    <Text style={styles.removeBtn}>내보내기</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
+              );
+            })}
 
-            {/* 참여 신청 목록 (방장 전용) */}
             {family.owner_id === myUserId && pendingRequests.length > 0 && (
               <View style={styles.pendingSection}>
                 <Text style={styles.pendingTitle}>참여 신청 {pendingRequests.length}건</Text>
                 {pendingRequests.map(req => (
                   <View key={req.id} style={styles.pendingRow}>
                     <View style={styles.memberAvatar}>
-                      <Text style={{ fontSize: 16 }}>🙋</Text>
+                      <Text style={styles.memberAvatarText}>+</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.memberEmail}>{req.display_name || req.email}</Text>
-                      <Text style={styles.memberRole}>{req.email}</Text>
+                      <Text style={styles.memberName}>{req.display_name || req.email}</Text>
+                      <Text style={styles.memberEmailSub}>{req.email}</Text>
                     </View>
                     <TouchableOpacity style={styles.approveBtn} onPress={() => handleApproveRequest(req)}>
                       <Text style={styles.approveTxt}>승인</Text>
@@ -394,18 +451,19 @@ export default function MyPageScreen() {
               </View>
             )}
 
-            {/* 초대 코드 */}
             <View style={styles.inviteBox}>
-              <View style={{ flex: 1 }}>
+              <View>
                 <Text style={styles.inviteLabel}>초대 코드</Text>
                 <Text style={styles.inviteCode}>{family.invite_code}</Text>
               </View>
-              <TouchableOpacity onPress={() => handleCopyCode(family.invite_code)} style={styles.regenBtn}>
-                <Text style={styles.regenTxt}>{codeCopied ? '복사됨 ✓' : '복사'}</Text>
+              <TouchableOpacity
+                style={[styles.copyBtn, codeCopied && styles.copyBtnDone]}
+                onPress={() => handleCopyCode(family.invite_code)}
+              >
+                <Text style={styles.copyBtnTxt}>{codeCopied ? '복사됨 ✓' : '복사'}</Text>
               </TouchableOpacity>
             </View>
 
-            {/* 탈퇴/해산 */}
             <TouchableOpacity onPress={handleLeaveOrDissolve} style={styles.leaveBtn}>
               <Text style={styles.leaveTxt}>
                 {family.owner_id === myUserId ? '패밀리 해산' : '패밀리 탈퇴'}
@@ -414,7 +472,9 @@ export default function MyPageScreen() {
           </View>
         ) : myPendingRequest ? (
           <View style={styles.pendingCard}>
-            <Text style={styles.pendingCardEmoji}>⏳</Text>
+            <View style={styles.pendingIconWrap}>
+              <Text style={styles.pendingIconText}>◷</Text>
+            </View>
             <Text style={styles.pendingCardTitle}>승인 대기 중이에요</Text>
             <Text style={styles.pendingCardDesc}>그룹장이 승인하면 패밀리에 합류돼요</Text>
             <TouchableOpacity style={styles.cancelRequestBtn} onPress={handleCancelMyRequest}>
@@ -435,21 +495,19 @@ export default function MyPageScreen() {
           </View>
         )}
 
-        {/* 메뉴 */}
+        {/* 설정 */}
         <Text style={[styles.sectionTitle, { marginTop: 8 }]}>설정</Text>
         <View style={styles.menuCard}>
-          {STATIC_MENU.map((item, i) => (
+          {MENU_ITEMS.map((item, i) => (
             <TouchableOpacity
               key={i}
-              style={[styles.menuRow, i < STATIC_MENU.length - 1 && styles.menuDivider]}
+              style={[styles.menuRow, i < MENU_ITEMS.length - 1 && styles.menuDivider]}
               activeOpacity={0.7}
-              onPress={
-              item.label === '앱 설정' ? () => router.push('/settings') :
-              item.label === '월간 건강 리포트' ? () => router.push('/health-report' as any) :
-              undefined
-            }
+              onPress={item.route ? () => router.push(item.route! as any) : undefined}
             >
-              <Text style={styles.menuEmoji}>{item.emoji}</Text>
+              <View style={[styles.menuIconChip, { backgroundColor: item.chipBg }]}>
+                <Text style={styles.menuIconText}>{item.icon}</Text>
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.menuLabel}>{item.label}</Text>
                 {item.sub ? <Text style={styles.menuSub}>{item.sub}</Text> : null}
@@ -465,6 +523,65 @@ export default function MyPageScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* 반려동물 사진 변경 확인 모달 */}
+      <Modal
+        visible={!!pendingPetPhotoUri}
+        transparent
+        animationType="slide"
+        onRequestClose={cancelPendingPhoto}
+      >
+        <View style={styles.photoConfirmOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={cancelPendingPhoto} />
+          <View style={styles.photoConfirmCard}>
+            <View style={styles.photoConfirmHeader}>
+              <Text style={styles.photoConfirmTitle}>프로필 사진 변경</Text>
+              <TouchableOpacity onPress={cancelPendingPhoto} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={styles.photoConfirmClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {pendingPetPhotoUri && (
+              <Image source={{ uri: pendingPetPhotoUri }} style={styles.photoConfirmPreview} />
+            )}
+            <View style={styles.photoConfirmBtns}>
+              <TouchableOpacity style={styles.photoConfirmCancelBtn} onPress={cancelPendingPhoto}>
+                <Text style={styles.photoConfirmCancelTxt}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.photoConfirmOkBtn} onPress={confirmPendingPhoto}>
+                <Text style={styles.photoConfirmOkTxt}>변경하기</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 반려동물 사진 피커 */}
+      <Modal
+        visible={!!photoPickerPetId}
+        transparent
+        animationType="none"
+        onRequestClose={() => setPhotoPickerPetId(null)}
+      >
+        <View style={styles.pickerOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setPhotoPickerPetId(null)} />
+          <View style={styles.pickerSheet}>
+            <TouchableOpacity style={styles.pickerItem} onPress={() => { const id = photoPickerPetId!; setPhotoPickerPetId(null); pickPetPhotoFromCamera(id); }}>
+              <Text style={styles.pickerItemText}>카메라로 촬영</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.pickerItem} onPress={() => { const id = photoPickerPetId!; setPhotoPickerPetId(null); pickPetPhotoFromGallery(id); }}>
+              <Text style={styles.pickerItemText}>앨범에서 선택</Text>
+            </TouchableOpacity>
+            {!!pets.find(p => p.id === photoPickerPetId)?.profile_photo_url && (
+              <TouchableOpacity style={styles.pickerItem} onPress={() => { const id = photoPickerPetId!; setPhotoPickerPetId(null); updatePet(id, { profile_photo_url: null }); }}>
+                <Text style={[styles.pickerItemText, { color: Colors.danger }]}>사진 제거</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.pickerCancel} onPress={() => setPhotoPickerPetId(null)}>
+              <Text style={styles.pickerCancelText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* 프로필 편집 모달 */}
       <Modal visible={editProfileVisible} transparent animationType="slide" onRequestClose={() => setEditProfileVisible(false)}>
@@ -559,206 +676,180 @@ export default function MyPageScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.bg },
-
-  profileHeader: {
-    backgroundColor: Colors.primary,
-    padding: 24, paddingTop: 20,
-    overflow: 'hidden', position: 'relative',
-  },
-  profileCircleBg: {
-    position: 'absolute', right: -30, top: -30,
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  avatar: {
-    width: 64, height: 64, borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)',
-  },
-  avatarEmoji: { fontSize: 28 },
-  userName: { fontSize: 18, fontWeight: '800', color: Colors.white },
-  userEmail: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
-
+  safe: { flex: 1, backgroundColor: MP.bg },
   content: { padding: 20, gap: 12 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: Colors.sub, marginBottom: 4 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: MP.sub, marginBottom: 4 },
+  chevron: { fontSize: 22, color: MP.muted },
 
+  // 프로필 카드
+  profileCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 20,
+    padding: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderWidth: 1, borderColor: MP.border,
+    ...Shadow.sm,
+    marginBottom: 4,
+  },
+  avatarWrap: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: MP.chipBg,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: MP.orange,
+    flexShrink: 0,
+  },
+  avatarInitial: { fontSize: 22, fontWeight: '800', color: MP.orange },
+  userName: { fontSize: 18, fontWeight: '800', color: MP.text },
+  userEmail: { fontSize: 12, color: MP.sub, marginTop: 2 },
+  editProfileBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1, borderColor: MP.orange,
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
+  },
+  editIcon: { fontSize: 13, color: MP.orange },
+  editProfileTxt: { fontSize: 13, fontWeight: '600', color: MP.orange },
+
+  emptyCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.card,
+    padding: 16, alignItems: 'center',
+    borderWidth: 1, borderColor: MP.border,
+  },
+
+  // 반려동물 카드
   petCard: {
     backgroundColor: Colors.white,
     borderRadius: Radius.card + 2,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1.5, borderColor: Colors.border,
+    borderWidth: 1, borderColor: MP.border,
+    overflow: 'hidden',
     ...Shadow.sm,
   },
+  petTopRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 16, gap: 14,
+  },
   petAvatar: {
-    width: 60, height: 60, borderRadius: 30,
-    backgroundColor: Colors.primaryLight,
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: MP.chipBg,
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2.5, borderColor: Colors.primary,
+    borderWidth: 2.5, borderColor: MP.orange,
     flexShrink: 0,
   },
-  petAvatarPhoto: { width: 60, height: 60, borderRadius: 30 },
-  petAvatarCameraIcon: { position: 'absolute', bottom: -4, right: -4, width: 24, height: 24 },
-  petNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  petName: { fontSize: 17, fontWeight: '800', color: Colors.text },
-  petGender: { fontSize: 13, color: Colors.sub },
-  breedPill: {
+  petAvatarPhoto: { width: 72, height: 72, borderRadius: 36 },
+  petAvatarLetter: { fontSize: 26, fontWeight: '800', color: MP.orange },
+  petCameraIcon: { position: 'absolute', bottom: -3, right: -3, width: 24, height: 24 },
+  petNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  petName: { fontSize: 18, fontWeight: '800', color: MP.text },
+  petGender: { fontSize: 15, fontWeight: '700' },
+  breedChip: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: MP.chipBg,
     borderRadius: Radius.pill,
-    paddingHorizontal: 8, paddingVertical: 2, marginBottom: 6,
+    paddingHorizontal: 8, paddingVertical: 3,
   },
-  breedText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
-  petMetaRow: { flexDirection: 'row', gap: 10 },
-  petMeta: { fontSize: 12, color: Colors.sub },
-  chevron: { fontSize: 22, color: Colors.light },
+  breedText: { fontSize: 12, color: MP.orange, fontWeight: '600' },
 
-  editProfileBtn: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    borderRadius: Radius.pill,
-    paddingHorizontal: 12, paddingVertical: 5,
-  },
-  editProfileTxt: { fontSize: 13, fontWeight: '700', color: Colors.white },
-
-  petDeleteBtn: {
-    padding: 4,
-    justifyContent: 'center',
-  },
-  petDeleteTxt: { fontSize: 18 },
+  statDivider: { height: 1, backgroundColor: MP.border },
+  statRow: { flexDirection: 'row', paddingVertical: 12, paddingHorizontal: 16 },
+  statItem: { flex: 1, alignItems: 'center', gap: 4 },
+  statSep: { width: 1, backgroundColor: MP.border, marginVertical: 4 },
+  statLabel: { fontSize: 11, color: MP.muted, fontWeight: '600' },
+  statValue: { fontSize: 13, fontWeight: '700', color: MP.text },
 
   addPetBtn: {
-    borderWidth: 2, borderColor: Colors.border, borderStyle: 'dashed',
+    borderWidth: 2, borderColor: MP.border, borderStyle: 'dashed',
     borderRadius: Radius.card,
     paddingVertical: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
-  addPetPlus: { fontSize: 20, color: Colors.primary, fontWeight: '300' },
-  addPetLabel: { fontSize: 14, fontWeight: '700', color: Colors.primary },
+  addPetPlus: { fontSize: 20, color: MP.orange, fontWeight: '300' },
+  addPetLabel: { fontSize: 14, fontWeight: '700', color: MP.orange },
 
-  menuCard: {
-    backgroundColor: Colors.white,
-    borderRadius: Radius.card,
-    overflow: 'hidden',
-    ...Shadow.sm,
-  },
-  menuRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 14, gap: 12,
-  },
-  menuDivider: { borderBottomWidth: 1, borderBottomColor: Colors.border },
-  menuEmoji: { fontSize: 20 },
-  menuLabel: { fontSize: 15, fontWeight: '600', color: Colors.text },
-  menuSub: { fontSize: 12, color: Colors.sub, marginTop: 1 },
-
-  logoutBtn: {
-    alignItems: 'center', paddingVertical: 14,
-  },
-  logoutText: { fontSize: 14, color: Colors.sub, fontWeight: '500' },
-
-  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-  modalCard: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40, gap: 10,
-  },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: Colors.text },
-  modalSub: { fontSize: 13, color: Colors.sub },
-  modalSaveBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12, paddingVertical: 14,
-    alignItems: 'center', marginTop: 8,
-  },
-  modalSaveTxt: { fontSize: 15, fontWeight: '800', color: Colors.white },
-
-  // 패밀리
+  // 패밀리 카드
   familyCard: {
     backgroundColor: Colors.white,
     borderRadius: Radius.card,
-    padding: 16,
-    gap: 12,
+    padding: 16, gap: 12,
+    borderWidth: 1, borderColor: MP.border,
     ...Shadow.sm,
   },
   familyHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: MP.border,
   },
-  familyName: { fontSize: 16, fontWeight: '800', color: Colors.text },
-  memberCount: { fontSize: 12, color: Colors.sub, fontWeight: '600' },
+  familyName: { fontSize: 15, fontWeight: '800', color: MP.text, flex: 1 },
+  memberCountChip: {
+    backgroundColor: MP.chipBg, borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 2,
+  },
+  memberCountText: { fontSize: 12, fontWeight: '700', color: MP.orange },
 
-  memberRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-  },
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   memberAvatar: {
     width: 36, height: 36, borderRadius: 18,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: '#F0ECE7',
     alignItems: 'center', justifyContent: 'center',
   },
-  memberEmail: { fontSize: 14, fontWeight: '600', color: Colors.text },
-  memberRole: { fontSize: 12, color: Colors.sub, marginTop: 1 },
-  removeBtn: { fontSize: 12, color: Colors.danger, fontWeight: '600' },
+  ownerAvatar: { backgroundColor: MP.chipBg },
+  memberAvatarText: { fontSize: 14, fontWeight: '700', color: MP.sub },
+  ownerAvatarText: { color: MP.orange },
+  memberNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  memberName: { fontSize: 14, fontWeight: '600', color: MP.text },
+  roleBadge: {
+    backgroundColor: '#EDE9E4', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2,
+  },
+  ownerBadge: { backgroundColor: MP.chipBg },
+  roleBadgeTxt: { fontSize: 10, fontWeight: '700', color: MP.sub },
+  ownerBadgeTxt: { color: MP.orange },
+  memberEmailSub: { fontSize: 11, color: MP.muted },
+  removeBtn: { fontSize: 12, color: MP.red, fontWeight: '600' },
 
   inviteBox: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.bg,
-    borderRadius: Radius.icon,
-    padding: 12, gap: 8,
-    borderWidth: 1, borderColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: MP.tintBox,
+    borderRadius: Radius.icon, padding: 14,
+    borderWidth: 1, borderColor: '#F5E0C0',
+    marginTop: 4,
   },
-  inviteLabel: { fontSize: 11, color: Colors.sub, marginBottom: 4 },
-  inviteCode: { fontSize: 22, fontWeight: '800', color: Colors.primary, letterSpacing: 3 },
-  regenBtn: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: Radius.icon,
-    paddingHorizontal: 12, paddingVertical: 8,
+  inviteLabel: { fontSize: 11, color: MP.sub, marginBottom: 4, fontWeight: '600' },
+  inviteCode: { fontSize: 22, fontWeight: '800', color: MP.text, letterSpacing: 3 },
+  copyBtn: {
+    backgroundColor: MP.orange,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 16, paddingVertical: 8,
   },
-  regenTxt: { fontSize: 12, color: Colors.primary, fontWeight: '700' },
+  copyBtnDone: { backgroundColor: MP.green },
+  copyBtnTxt: { fontSize: 13, fontWeight: '700', color: Colors.white },
 
   leaveBtn: { alignItems: 'center', paddingTop: 4 },
-  leaveTxt: { fontSize: 13, color: Colors.danger, fontWeight: '600' },
+  leaveTxt: { fontSize: 13, color: MP.red, fontWeight: '600' },
 
   familyEmptyCard: {
     backgroundColor: Colors.white,
-    borderRadius: Radius.card,
-    padding: 20,
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1.5, borderColor: Colors.border,
-    borderStyle: 'dashed',
+    borderRadius: Radius.card, padding: 20,
+    alignItems: 'center', gap: 14,
+    borderWidth: 1.5, borderColor: MP.border, borderStyle: 'dashed',
   },
-  familyEmptyDesc: { fontSize: 13, color: Colors.sub, textAlign: 'center' },
+  familyEmptyDesc: { fontSize: 13, color: MP.sub, textAlign: 'center' },
   familyBtnRow: { flexDirection: 'row', gap: 10 },
   familyCreateBtn: {
     flex: 1, backgroundColor: Colors.primary,
-    borderRadius: Radius.button, paddingVertical: 12,
-    alignItems: 'center',
+    borderRadius: Radius.button, paddingVertical: 12, alignItems: 'center',
   },
   familyCreateTxt: { fontSize: 14, fontWeight: '700', color: Colors.white },
   familyJoinBtn: {
-    flex: 1, backgroundColor: Colors.primaryLight,
-    borderRadius: Radius.button, paddingVertical: 12,
-    alignItems: 'center',
+    flex: 1, backgroundColor: MP.chipBg,
+    borderRadius: Radius.button, paddingVertical: 12, alignItems: 'center',
   },
   familyJoinTxt: { fontSize: 14, fontWeight: '700', color: Colors.primary },
 
-  textInput: {
-    borderWidth: 1.5, borderColor: Colors.border,
-    borderRadius: Radius.button,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 15, color: Colors.text,
-    marginTop: 4,
-  },
-
-  // 참여 신청 목록 (방장용)
+  // 참여 신청 목록
   pendingSection: {
-    borderTopWidth: 1, borderTopColor: Colors.border,
+    borderTopWidth: 1, borderTopColor: MP.border,
     paddingTop: 10, gap: 8,
   },
-  pendingTitle: { fontSize: 13, fontWeight: '700', color: Colors.sub },
+  pendingTitle: { fontSize: 13, fontWeight: '700', color: MP.sub },
   pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   approveBtn: {
     backgroundColor: Colors.primary,
@@ -767,42 +858,115 @@ const styles = StyleSheet.create({
   },
   approveTxt: { fontSize: 12, fontWeight: '700', color: Colors.white },
   rejectBtn: {
-    backgroundColor: Colors.bg,
+    backgroundColor: MP.bg,
     borderRadius: Radius.icon,
     paddingHorizontal: 10, paddingVertical: 5,
-    borderWidth: 1, borderColor: Colors.border,
+    borderWidth: 1, borderColor: MP.border,
   },
-  rejectTxt: { fontSize: 12, fontWeight: '600', color: Colors.sub },
+  rejectTxt: { fontSize: 12, fontWeight: '600', color: MP.sub },
 
-  // 승인 대기 중 카드 (신청자용)
+  // 승인 대기 중 카드
   pendingCard: {
     backgroundColor: Colors.white,
-    borderRadius: Radius.card,
-    padding: 24,
-    alignItems: 'center',
-    gap: 8,
+    borderRadius: Radius.card, padding: 24,
+    alignItems: 'center', gap: 8,
     borderWidth: 1.5, borderColor: Colors.primary,
     ...Shadow.sm,
   },
-  pendingCardEmoji: { fontSize: 32 },
-  pendingCardTitle: { fontSize: 16, fontWeight: '800', color: Colors.text },
-  pendingCardDesc: { fontSize: 13, color: Colors.sub, textAlign: 'center' },
+  pendingIconWrap: {
+    width: 60, height: 60, borderRadius: 30,
+    backgroundColor: MP.chipBg,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 4,
+  },
+  pendingIconText: { fontSize: 28, color: MP.orange },
+  pendingCardTitle: { fontSize: 16, fontWeight: '800', color: MP.text },
+  pendingCardDesc: { fontSize: 13, color: MP.sub, textAlign: 'center' },
   cancelRequestBtn: { marginTop: 8, paddingVertical: 4 },
-  cancelRequestTxt: { fontSize: 13, color: Colors.danger, fontWeight: '600' },
+  cancelRequestTxt: { fontSize: 13, color: MP.red, fontWeight: '600' },
 
-  premiumBadgeRow: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: Radius.pill,
-    paddingHorizontal: 14, paddingVertical: 8,
-    alignSelf: 'flex-start',
+  // 설정 메뉴
+  menuCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.card, overflow: 'hidden',
+    borderWidth: 1, borderColor: MP.border,
+    ...Shadow.sm,
   },
-  premiumBadgeTxt: { fontSize: 13, fontWeight: '700', color: Colors.primary },
-  upgradeBanner: {
-    backgroundColor: Colors.primaryLight,
-    borderRadius: Radius.card,
-    paddingHorizontal: 16, paddingVertical: 12,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  menuRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 14, gap: 14,
   },
-  upgradeTxt: { fontSize: 14, fontWeight: '700', color: Colors.primary },
-  upgradeChevron: { fontSize: 20, color: Colors.primary },
+  menuDivider: { borderBottomWidth: 1, borderBottomColor: MP.border },
+  menuIconChip: {
+    width: 40, height: 40, borderRadius: Radius.icon,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  menuIconText: { fontSize: 20 },
+  menuLabel: { fontSize: 15, fontWeight: '600', color: MP.text },
+  menuSub: { fontSize: 12, color: MP.sub, marginTop: 1 },
+
+  logoutBtn: { alignItems: 'center', paddingVertical: 14 },
+  logoutText: { fontSize: 14, color: MP.sub, fontWeight: '500' },
+
+  // 사진 피커
+  pickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  pickerSheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingBottom: 34, overflow: 'hidden',
+  },
+  pickerItem: {
+    paddingVertical: 17, alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: MP.border,
+  },
+  pickerItemText: { fontSize: 16, color: MP.text },
+  pickerCancel: { paddingVertical: 17, alignItems: 'center', marginTop: 8 },
+  pickerCancelText: { fontSize: 16, fontWeight: '700', color: MP.sub },
+
+  // 사진 변경 확인 모달
+  photoConfirmOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  photoConfirmCard: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40,
+    alignItems: 'center', gap: 20,
+  },
+  photoConfirmHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+  photoConfirmTitle: { fontSize: 17, fontWeight: '800', color: MP.text },
+  photoConfirmClose: { fontSize: 18, color: MP.sub, paddingLeft: 8 },
+  photoConfirmPreview: { width: 160, height: 160, borderRadius: 80, backgroundColor: MP.chipBg },
+  photoConfirmBtns: { flexDirection: 'row', gap: 12, width: '100%' },
+  photoConfirmCancelBtn: {
+    flex: 1, paddingVertical: 14,
+    borderRadius: Radius.button, borderWidth: 1.5, borderColor: MP.border, alignItems: 'center',
+  },
+  photoConfirmCancelTxt: { fontSize: 15, fontWeight: '700', color: MP.sub },
+  photoConfirmOkBtn: {
+    flex: 2, paddingVertical: 14,
+    borderRadius: Radius.button, backgroundColor: Colors.primary, alignItems: 'center',
+  },
+  photoConfirmOkTxt: { fontSize: 15, fontWeight: '700', color: Colors.white },
+
+  // 공통 모달
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalCard: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 40, gap: 10,
+  },
+  modalTitle: { fontSize: 17, fontWeight: '800', color: MP.text },
+  modalSub: { fontSize: 13, color: MP.sub },
+  modalSaveBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 12, paddingVertical: 14,
+    alignItems: 'center', marginTop: 8,
+  },
+  modalSaveTxt: { fontSize: 15, fontWeight: '800', color: Colors.white },
+  textInput: {
+    borderWidth: 1.5, borderColor: MP.border,
+    borderRadius: Radius.button,
+    paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 15, color: MP.text,
+    marginTop: 4,
+  },
 });

@@ -18,6 +18,7 @@ export interface Photo {
 export interface PickedPhoto {
   data: Uint8Array;
   bytes: number;
+  takenAt?: string; // 'YYYY-MM-DD', EXIF 추출 성공 시에만 존재
 }
 
 export const FREE_LIMIT_BYTES = 100 * 1024 * 1024; // 100MB (패밀리 공유 풀)
@@ -46,14 +47,22 @@ async function resizeAsset(asset: ImagePicker.ImagePickerAsset): Promise<PickedP
   const binary = atob(resized.base64);
   const data = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) data[i] = binary.charCodeAt(i);
-  return { data, bytes: asset.fileSize ?? data.byteLength };
+
+  let takenAt: string | undefined;
+  const raw = asset.exif?.DateTimeOriginal ?? asset.exif?.DateTime;
+  if (raw && typeof raw === 'string') {
+    const match = raw.match(/^(\d{4}):(\d{2}):(\d{2})/);
+    if (match) takenAt = `${match[1]}-${match[2]}-${match[3]}`;
+  }
+
+  return { data, bytes: asset.fileSize ?? data.byteLength, takenAt };
 }
 
 export async function pickAndResize(): Promise<PickedPhoto | null> {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) return null;
 
-  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.9 });
+  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.9, exif: true });
   if (result.canceled || !result.assets[0]) return null;
   return resizeAsset(result.assets[0]);
 }
@@ -67,6 +76,7 @@ export async function pickMultipleAndResize(): Promise<PickedPhoto[]> {
     quality: 0.9,
     allowsMultipleSelection: true,
     selectionLimit: 20,
+    exif: true,
   });
   if (result.canceled) return [];
 
@@ -147,7 +157,7 @@ export const usePhotoStore = create<PhotoStore>((set, get) => ({
           user_id: session.user.id,
           photo_url: publicUrl,
           storage_path: path,
-          taken_at: today,
+          taken_at: picked.takenAt ?? today,
           notes: null,
           storage_bytes: picked.bytes,
         })
@@ -221,7 +231,7 @@ export const usePhotoStore = create<PhotoStore>((set, get) => ({
           user_id: session.user.id,
           photo_url: publicUrl,
           storage_path: path,
-          taken_at: today,
+          taken_at: picked.takenAt ?? today,
           notes: notes ?? null,
           storage_bytes: picked.bytes,
         })

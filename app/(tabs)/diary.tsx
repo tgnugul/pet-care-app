@@ -21,6 +21,10 @@ const DAYS_LABEL = ['일', '월', '화', '수', '목', '금', '토'];
 
 function daysInMonth(y: number, m: number) { return new Date(y, m, 0).getDate(); }
 function startDayOfMonth(y: number, m: number) { return new Date(y, m - 1, 1).getDay(); }
+function formatDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-');
+  return `${y}년 ${Number(m)}월 ${Number(d)}일`;
+}
 
 export default function DiaryScreen() {
   const now = new Date();
@@ -330,6 +334,12 @@ export default function DiaryScreen() {
         )}
 
 
+        {photos.length > 0 && (
+          <TouchableOpacity style={styles.allPhotosBtn} onPress={() => setGalleryVisible(true)}>
+            <Text style={styles.allPhotosBtnText}>전체 사진 보기</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={{ height: 100 }} />
       </ScrollView>
 
@@ -377,34 +387,36 @@ export default function DiaryScreen() {
         </TouchableOpacity>
       </Modal>
 
-      {/* 전체 갤러리 모달 */}
+      {/* 전체 갤러리 모달 — 타임라인 뷰 */}
       <Modal visible={galleryVisible} animationType="slide" onRequestClose={() => setGalleryVisible(false)}>
         <SafeAreaView style={styles.safe}>
           <View style={styles.galleryHeader}>
-            <Text style={styles.galleryTitle}>{year}년 {month}월 전체 사진</Text>
+            <Text style={styles.galleryTitle}>전체 사진</Text>
             <TouchableOpacity onPress={() => setGalleryVisible(false)}>
               <Text style={styles.galleryClose}>닫기</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={styles.galleryContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.gridRow}>
-              {monthPhotos.map(photo => (
-                <TouchableOpacity
-                  key={photo.id}
-                  style={styles.photoCell}
-                  activeOpacity={0.85}
-                  onPress={() => setViewing(photo)}
-                >
-                  <Image source={{ uri: photo.photo_url }} style={styles.photoImage} contentFit="cover" />
-                  <View style={styles.photoCaption}>
-                    {photo.notes
-                      ? <Text style={styles.photoName} numberOfLines={1}>{photo.notes}</Text>
-                      : null}
-                    <Text style={styles.photoDate}>{photo.taken_at.slice(5).replace('-', '/')}</Text>
+            {Object.entries(groupByDate(photos))
+              .sort((a, b) => b[0].localeCompare(a[0]))
+              .map(([date, datePhotos]) => (
+                <View key={date} style={styles.timelineSection}>
+                  <Text style={styles.timelineDateHeader}>{formatDate(date)}</Text>
+                  <View style={styles.timelineGrid}>
+                    {datePhotos.map(photo => (
+                      <TouchableOpacity
+                        key={photo.id}
+                        style={styles.timelineCell}
+                        activeOpacity={0.85}
+                        onPress={() => setViewing(photo)}
+                      >
+                        <Image source={{ uri: photo.photo_url }} style={styles.timelinePhoto} contentFit="cover" />
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+                </View>
+              ))
+            }
             <View style={{ height: 40 }} />
           </ScrollView>
         </SafeAreaView>
@@ -607,16 +619,23 @@ const styles = StyleSheet.create({
   galleryClose: { fontSize: 14, fontWeight: '600', color: Colors.primary },
   galleryContent: { padding: 16 },
 
-  // 2열 그리드 (갤러리용)
-  gridRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  photoCell: {
-    width: '47.5%', backgroundColor: Colors.white,
-    borderRadius: Radius.card, overflow: 'hidden', ...Shadow.sm,
+  // 타임라인 갤러리
+  timelineSection: { marginBottom: 20 },
+  timelineDateHeader: { fontSize: 13, fontWeight: '700', color: Colors.sub, marginBottom: 8 },
+  timelineGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
+  timelineCell: { width: '32.3%', aspectRatio: 1, borderRadius: 6, overflow: 'hidden' },
+  timelinePhoto: { width: '100%', height: '100%' },
+
+  // 전체 사진 보기 버튼
+  allPhotosBtn: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.card,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderWidth: 1.5, borderColor: Colors.border,
+    ...Shadow.sm,
   },
-  photoImage: { width: '100%', aspectRatio: 1 },
-  photoCaption: { paddingHorizontal: 10, paddingTop: 7, paddingBottom: 9, gap: 2 },
-  photoName: { fontSize: 13, fontWeight: '700', color: Colors.text },
-  photoDate: { fontSize: 11, color: Colors.sub },
+  allPhotosBtnText: { fontSize: 14, fontWeight: '700', color: Colors.primary },
 
   // 이름 입력 모달
   nameOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },

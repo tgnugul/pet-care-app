@@ -36,7 +36,15 @@ export default function WelcomeScreen() {
           >
             <Text style={styles.choiceEmoji}>🤔</Text>
             <Text style={styles.choiceNoLabel}>아직 없어요</Text>
-            <Text style={styles.choiceNoSub}>설문으로 맞는 동물을 찾아볼게요</Text>
+            <Text style={styles.choiceNoSub}>어떤 동물이 맞는지 알아볼게요</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.skipBtn}
+            activeOpacity={0.7}
+            onPress={() => { markOnboardingSeen(); router.replace('/(tabs)'); }}
+          >
+            <Text style={styles.skipText}>나중에 할게요</Text>
           </TouchableOpacity>
         </View>
 
@@ -84,6 +92,9 @@ const styles = StyleSheet.create({
   },
   choiceNoLabel: { fontSize: 18, fontWeight: '800', color: Colors.text },
   choiceNoSub: { fontSize: 13, color: Colors.sub },
+
+  skipBtn: { alignItems: 'center', paddingVertical: 10 },
+  skipText: { fontSize: 14, color: Colors.light },
 
   loginLink: { alignItems: 'center', paddingVertical: 8 },
   loginLinkText: { fontSize: 14, color: Colors.sub },

@@ -71,3 +71,7 @@ export async function getWalkWidgetCache(): Promise<WalkWidgetCache | null> {
   if (!raw) return null;
   try { return JSON.parse(raw) as WalkWidgetCache; } catch { return null; }
 }
+
+export async function clearWidgetData(): Promise<void> {
+  await AsyncStorage.multiRemove([CARE_KEY, WALK_STATE_KEY, WALK_WIDGET_CACHE_KEY]);
+}

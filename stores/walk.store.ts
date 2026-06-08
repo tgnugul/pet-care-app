@@ -54,7 +54,8 @@ export function calcMonthStats(logs: WalkLog[]): WalkMonthStats {
   });
   if (monthLogs.length === 0) return { totalDistanceKm: 0, count: 0, avgMinutes: 0 };
   const totalDistanceKm = monthLogs.reduce((s, l) => s + l.distance_km, 0);
-  const avgMinutes = monthLogs.reduce((s, l) => s + l.duration_minutes, 0) / monthLogs.length;
+  const totalMinutes = monthLogs.reduce((s, l) => s + l.duration_minutes, 0);
+  const avgMinutes = totalMinutes / now.getDate();
   return { totalDistanceKm, count: monthLogs.length, avgMinutes };
 }
 

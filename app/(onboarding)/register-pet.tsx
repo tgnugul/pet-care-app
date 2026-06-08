@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Switch, Image,
+  View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Switch, Image, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -30,18 +30,11 @@ export default function RegisterPetScreen() {
   const [neutered, setNeutered] = useState(false);
   const [profilePhotoUri, setProfilePhotoUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
   const { fetchPets } = usePetStore();
 
   function pickPhoto() {
-    const buttons: Parameters<typeof Alert.alert>[2] = [
-      { text: '카메라로 촬영', onPress: pickFromCamera },
-      { text: '앨범에서 선택', onPress: pickFromGallery },
-    ];
-    if (profilePhotoUri) {
-      buttons.push({ text: '사진 제거', style: 'destructive', onPress: () => setProfilePhotoUri(null) });
-    }
-    buttons.push({ text: '취소', style: 'cancel' });
-    Alert.alert('프로필 사진', '사진을 선택하는 방법을 선택해주세요', buttons);
+    setShowPhotoPicker(true);
   }
 
   async function pickFromCamera() {
@@ -141,8 +134,17 @@ export default function RegisterPetScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <Text style={styles.title}>반려동물 등록</Text>
-        <Text style={styles.sub}>아이의 정보를 입력해주세요</Text>
+        <TouchableOpacity
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
+          style={styles.backBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.backBtnText}>‹</Text>
+        </TouchableOpacity>
+        <View style={styles.headerTitles}>
+          <Text style={styles.title}>반려동물 등록</Text>
+          <Text style={styles.sub}>아이의 정보를 입력해주세요</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -257,6 +259,33 @@ export default function RegisterPetScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <Modal
+        visible={showPhotoPicker}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowPhotoPicker(false)}
+      >
+        <View style={styles.pickerOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowPhotoPicker(false)} />
+          <View style={styles.pickerSheet}>
+            <TouchableOpacity style={styles.pickerItem} onPress={() => { setShowPhotoPicker(false); pickFromCamera(); }}>
+              <Text style={styles.pickerItemText}>카메라로 촬영</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.pickerItem} onPress={() => { setShowPhotoPicker(false); pickFromGallery(); }}>
+              <Text style={styles.pickerItemText}>앨범에서 선택</Text>
+            </TouchableOpacity>
+            {!!profilePhotoUri && (
+              <TouchableOpacity style={styles.pickerItem} onPress={() => { setShowPhotoPicker(false); setProfilePhotoUri(null); }}>
+                <Text style={[styles.pickerItemText, { color: Colors.danger }]}>사진 제거</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.pickerCancel} onPress={() => setShowPhotoPicker(false)}>
+              <Text style={styles.pickerCancelText}>취소</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -267,10 +296,14 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: Colors.white,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
-    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 14,
+    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
   },
-  title: { fontSize: 22, fontWeight: '800', color: Colors.text },
-  sub: { fontSize: 13, color: Colors.sub, marginTop: 4 },
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  backBtnText: { fontSize: 28, color: Colors.text, lineHeight: 32 },
+  headerTitles: { flex: 1 },
+  title: { fontSize: 20, fontWeight: '800', color: Colors.text },
+  sub: { fontSize: 13, color: Colors.sub, marginTop: 2 },
 
   content: { padding: 20, gap: 8 },
 
@@ -347,4 +380,18 @@ const styles = StyleSheet.create({
 
   skipBtn: { alignItems: 'center', paddingVertical: 12 },
   skipBtnText: { fontSize: 13, color: Colors.light },
+
+  pickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  pickerSheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingBottom: 34, overflow: 'hidden',
+  },
+  pickerItem: {
+    paddingVertical: 17, alignItems: 'center',
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  pickerItemText: { fontSize: 16, color: Colors.text },
+  pickerCancel: { paddingVertical: 17, alignItems: 'center', marginTop: 8 },
+  pickerCancelText: { fontSize: 16, fontWeight: '700', color: Colors.sub },
 });

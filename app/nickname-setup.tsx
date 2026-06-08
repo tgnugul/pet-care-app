@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator,
+  TouchableWithoutFeedback, Keyboard, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -18,9 +19,15 @@ export default function NicknameSetupScreen() {
   async function handleConfirm() {
     if (!ready) return;
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({
+    const { data, error } = await supabase.auth.updateUser({
       data: { display_name: trimmed },
     });
+    if (!error && data.user) {
+      await supabase.from('profiles').upsert(
+        { user_id: data.user.id, nickname: trimmed },
+        { onConflict: 'user_id' }
+      );
+    }
     setLoading(false);
     if (!error) {
       router.replace('/(onboarding)/welcome');
@@ -29,37 +36,43 @@ export default function NicknameSetupScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.kav}>
-        <View style={styles.container}>
-          <Text style={styles.emoji}>🐾</Text>
-          <Text style={styles.title}>뽀시래기에 오신 걸 환영해요!</Text>
-          <Text style={styles.sub}>앱에서 사용할 닉네임을 설정해주세요</Text>
-
-          <TextInput
-            style={styles.input}
-            placeholder="닉네임 (최대 20자)"
-            placeholderTextColor={Colors.light}
-            value={nickname}
-            onChangeText={setNickname}
-            autoCorrect={false}
-            autoFocus
-            maxLength={20}
-            returnKeyType="done"
-            onSubmitEditing={handleConfirm}
-          />
-          <Text style={styles.hint}>닉네임은 가족 그룹에서 나를 구분하는 데 사용돼요</Text>
-
-          <TouchableOpacity
-            style={[styles.btn, !ready && styles.btnDisabled]}
-            onPress={handleConfirm}
-            disabled={!ready}
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.container}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {loading
-              ? <ActivityIndicator color={Colors.white} />
-              : <Text style={styles.btnText}>시작하기</Text>
-            }
-          </TouchableOpacity>
-        </View>
+            <Text style={styles.emoji}>🐾</Text>
+            <Text style={styles.title}>뽀시래기에 오신 걸 환영해요!</Text>
+            <Text style={styles.sub}>앱에서 사용할 닉네임을 설정해주세요</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="닉네임 (최대 20자)"
+              placeholderTextColor={Colors.light}
+              value={nickname}
+              onChangeText={setNickname}
+              autoCorrect={false}
+              autoFocus
+              maxLength={20}
+              returnKeyType="done"
+              onSubmitEditing={handleConfirm}
+            />
+            <Text style={styles.hint}>닉네임은 가족 그룹에서 나를 구분하는 데 사용돼요</Text>
+
+            <TouchableOpacity
+              style={[styles.btn, !ready && styles.btnDisabled]}
+              onPress={handleConfirm}
+              disabled={!ready}
+            >
+              {loading
+                ? <ActivityIndicator color={Colors.white} />
+                : <Text style={styles.btnText}>시작하기</Text>
+              }
+            </TouchableOpacity>
+          </ScrollView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -69,10 +82,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   kav: { flex: 1 },
   container: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
+    paddingVertical: 48,
     gap: 12,
   },
   emoji: { fontSize: 52, marginBottom: 4 },

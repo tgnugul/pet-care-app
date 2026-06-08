@@ -40,9 +40,33 @@ function formatMinutes(sec: number): string {
 interface Props {
   state: WalkWidgetState | null;
   cache?: WalkWidgetCache | null;
+  loggedOut?: boolean;
 }
 
-export function WalkWidget({ state, cache }: Props) {
+export function WalkWidget({ state, cache, loggedOut }: Props) {
+  if (loggedOut) {
+    return (
+      <FlexWidget
+        clickAction="OPEN_URI"
+        clickActionData={{ uri: 'pawmate://' }}
+        style={{
+          flexDirection: 'column',
+          width: 'match_parent',
+          height: 'match_parent',
+          backgroundColor: C.widget,
+          borderRadius: 24,
+          padding: 14,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <TextWidget text="🐾" style={{ fontSize: 28, marginBottom: 8 }} />
+        <TextWidget text="로그인이 필요해요" style={{ fontSize: 14, fontWeight: 'bold', color: C.text, marginBottom: 6 }} />
+        <TextWidget text="탭해서 시작하기 →" style={{ fontSize: 12, color: C.muted }} />
+      </FlexWidget>
+    );
+  }
+
   const isWalking = state?.isWalking ?? false;
 
   // ── 산책 중 ──────────────────────────────────────────────

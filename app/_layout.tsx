@@ -15,7 +15,6 @@ import { requestNotificationPermission, registerPushToken, setupNotificationCate
 import { useCareStore, calcNextDue } from '@/stores/schedule.store';
 import type { CareSchedule, Frequency } from '@/stores/schedule.store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { resetRevenueCatUser } from '@/lib/revenuecat';
 import { usePetStore } from '@/stores/pet.store';
 import { useWalkStore } from '@/stores/walk.store';
 import { useSettingsStore } from '@/stores/settings.store';
@@ -95,7 +94,6 @@ export default function RootLayout() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
-        await resetRevenueCatUser();
         await AsyncStorage.removeItem('onboarding_seen');
         await useCareStore.getState().unsubscribeSchedules();
         usePetStore.setState({ pets: [] });
@@ -187,7 +185,6 @@ export default function RootLayout() {
         <Stack.Screen name="care-add" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="recommend" options={{ headerShown: false }} />
-        <Stack.Screen name="paywall" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="walk-detail" options={{ headerShown: false }} />
         <Stack.Screen name="health-report" options={{ headerShown: false }} />
         <Stack.Screen name="nickname-setup" options={{ headerShown: false }} />

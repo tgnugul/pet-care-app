@@ -81,12 +81,12 @@ export function isDoneToday(schedule: CareSchedule): boolean {
 }
 
 export const CARE_TYPE_META: Record<CareType, { emoji: string; label: string }> = {
-  meal:         { emoji: '🍚', label: '밥' },
+  meal:         { emoji: '🥣', label: '밥' },
   medicine:     { emoji: '💊', label: '약' },
   hospital:     { emoji: '🏥', label: '병원' },
-  ear_cleaning: { emoji: '👂', label: '귀 청소' },
+  ear_cleaning: { emoji: '🪥', label: '귀 청소' },
   bath:         { emoji: '🛁', label: '목욕' },
-  nail:         { emoji: '✂️', label: '발톱' },
+  nail:         { emoji: '🐾', label: '발톱' },
   other:        { emoji: '🐾', label: '기타' },
 };
 
@@ -117,7 +117,10 @@ export const useCareStore = create<ScheduleStore>((set, get) => ({
       set({ schedules: data as CareSchedule[], careStreak: streak });
       const petName = usePetStore.getState().pets[0]?.name ?? '반려동물';
       const summaryHour = useSettingsStore.getState().summaryHour;
-      const hasIncomplete = (data as CareSchedule[]).some(sc => !isDoneToday(sc));
+      const todayStr = localDateStr();
+      const hasIncomplete = (data as CareSchedule[]).some(sc =>
+        (sc.frequency === 'daily' || sc.next_due_at.slice(0, 10) <= todayStr) && !isDoneToday(sc),
+      );
       if (hasIncomplete) {
         scheduleDailySummary(petName, summaryHour);
       } else {
@@ -214,7 +217,10 @@ export const useCareStore = create<ScheduleStore>((set, get) => ({
       const schedule = updated.find(sc => sc.id === id);
       if (schedule) rescheduleAfterDone(schedule, petName);
 
-      const hasIncomplete = updated.some(sc => !isDoneToday(sc));
+      const todayStr2 = localDateStr();
+      const hasIncomplete = updated.some(sc =>
+        (sc.frequency === 'daily' || sc.next_due_at.slice(0, 10) <= todayStr2) && !isDoneToday(sc),
+      );
       if (!hasIncomplete) cancelDailySummary();
 
       import('@/lib/widget-sync').then(({ syncWidgetData }) =>
@@ -276,7 +282,12 @@ export const useCareStore = create<ScheduleStore>((set, get) => ({
       set({ schedules: updated });
 
       const petName = usePetStore.getState().pets[0]?.name ?? '반려동물';
-      scheduleDailySummary(petName);
+      const todayStr3 = localDateStr();
+      const summaryHour2 = useSettingsStore.getState().summaryHour;
+      const hasIncompleteAfterUndo = updated.some(sc =>
+        (sc.frequency === 'daily' || sc.next_due_at.slice(0, 10) <= todayStr3) && !isDoneToday(sc),
+      );
+      if (hasIncompleteAfterUndo) scheduleDailySummary(petName, summaryHour2);
       import('@/lib/widget-sync').then(({ syncWidgetData }) =>
         syncWidgetData(petName, updated),
       );

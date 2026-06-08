@@ -1,11 +1,21 @@
 "use no memo";
 import React from 'react';
 import { Appearance } from 'react-native';
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, ImageWidget, TextWidget } from 'react-native-android-widget';
 import type { HexColor } from 'react-native-android-widget';
 import type { WidgetData } from '@/lib/widget-storage';
 
 const dark = Appearance.getColorScheme() === 'dark';
+
+const CARE_IMAGES: Record<string, number> = {
+  meal:         require('@/assets/images/care/meal.png'),
+  medicine:     require('@/assets/images/care/medicine.png'),
+  hospital:     require('@/assets/images/care/hospital.png'),
+  ear_cleaning: require('@/assets/images/care/ear_cleaning.png'),
+  bath:         require('@/assets/images/care/bath.png'),
+  nail:         require('@/assets/images/care/nail.png'),
+  other:        require('@/assets/images/care/other.png'),
+};
 
 const C = {
   accent:      '#F2A23C' as HexColor,
@@ -41,10 +51,34 @@ function getChip(type?: string) {
 }
 
 interface Props {
-  data: WidgetData;
+  data: WidgetData | null;
+  loggedOut?: boolean;
 }
 
-export function CareWidget({ data }: Props) {
+export function CareWidget({ data, loggedOut }: Props) {
+  if (loggedOut || !data) {
+    return (
+      <FlexWidget
+        clickAction="OPEN_URI"
+        clickActionData={{ uri: 'pawmate://' }}
+        style={{
+          flexDirection: 'column',
+          width: 'match_parent',
+          height: 'match_parent',
+          backgroundColor: C.widget,
+          borderRadius: 24,
+          padding: 14,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <TextWidget text="🐾" style={{ fontSize: 28, marginBottom: 8 }} />
+        <TextWidget text="로그인이 필요해요" style={{ fontSize: 14, fontWeight: 'bold', color: C.text, marginBottom: 6 }} />
+        <TextWidget text="탭해서 시작하기 →" style={{ fontSize: 12, color: C.muted }} />
+      </FlexWidget>
+    );
+  }
+
   const items = data.items;
   const doneCount = items.filter(i => i.done).length;
   const total = items.length;
@@ -167,7 +201,11 @@ export function CareWidget({ data }: Props) {
                     marginRight: 7,
                   }}
                 >
-                  <TextWidget text={item.emoji} style={{ fontSize: 12 }} />
+                  <ImageWidget
+                    image={CARE_IMAGES[item.type ?? 'other'] ?? CARE_IMAGES.other}
+                    imageWidth={16}
+                    imageHeight={16}
+                  />
                 </FlexWidget>
 
                 {/* 레이블 */}
