@@ -117,10 +117,13 @@ export default function RootLayout() {
         }
         router.replace('/(auth)/login');
       }
-      if (event === 'SIGNED_IN') {
-        registerPushToken();
-        if (!session?.user.user_metadata?.display_name) {
-          router.replace('/nickname-setup');
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        if (session) {
+          registerPushToken();
+          useFamilyStore.getState().fetchFamily();
+          if (event === 'SIGNED_IN' && !session.user.user_metadata?.display_name) {
+            router.replace('/nickname-setup');
+          }
         }
       }
     });
