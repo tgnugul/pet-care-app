@@ -1,5 +1,8 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# Firebase 서비스 계정 키 (서버 비밀키 — 절대 커밋 금지)
+*firebase-adminsdk*.json
+
 # AI 에이전트 환경변수
 agents/.env
 agents/context/outputs/
